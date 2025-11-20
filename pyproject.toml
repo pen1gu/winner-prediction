@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "winner-prediction"
+version = "0.1.0"
+description = "fotmob base의 축구 승부 예측"
+authors = ["Joon <kkkths@naver.com>"]
+readme = "README.md"
+packages = [{include = "fotmob_player", from = "."}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+httpx = "^0.25.0"
+
+[tool.poetry.group.dev.dependencies]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
