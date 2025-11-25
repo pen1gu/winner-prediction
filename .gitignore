@@ -44,3 +44,7 @@ Thumbs.db
 *.json
 !package*.json
 
+# Environment variables
+.env
+.env.local
+

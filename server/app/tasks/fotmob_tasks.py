@@ -1,0 +1,3 @@
+tasks = [
+    "player_info",
+]
