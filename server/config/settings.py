@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     # 로깅 설정
     log_level: str = "INFO"
     log_format: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+    # 데이터베이스 설정 (PostgreSQL / Async)
+    database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/winner_prediction"
+    database_echo: bool = False
     
     class Config:
         env_file = ".env"
