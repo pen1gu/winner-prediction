@@ -27,7 +27,7 @@ class FotMobHTTPClient:
             "Accept": "application/json, text/plain, */*",
             "Accept-Language": f"{settings.fotmob_language}-KR,{settings.fotmob_language};q=0.9,en-US;q=0.8,en;q=0.7",
             "Referer": f"{settings.fotmob_base_url}/",
-            "x-mas": "eyJib2R5Ijp7InVybCI6Ii9hcGkvZGF0YS90ZWFtcz9pZD05ODI1JmNjb2RlMz1LT1IiLCJjb2RlIjoxNzY0MDc1NjgyMTA0LCJmb28iOiJwcm9kdWN0aW9uOmFkNGY2NmVlODlhMWIwMGRjZjFmOTYwZGU4OTRkZWFlYThlZWExOTEifSwic2lnbmF0dXJlIjoiNTAyQzU5QTAyNDg2NTk4OUUwNkZDNjg3MUUzMjEzQUYifQ==",
+            "x-mas": "eyJib2R5Ijp7InVybCI6Ii9hcGkvZGF0YS90ZWFtcz9pZD05ODI1JmNjb2RlMz1LT1IiLCJjb2RlIjoxNzY0MjA5MzE4NTg3LCJmb28iOiJwcm9kdWN0aW9uOjEzMjc0NzhiNTQwNjc3NTIzNjhlOWUwZGEzZWUzNjM5MGJjMGY3NzcifSwic2lnbmF0dXJlIjoiQjc4N0I0RTdFRkEwN0QyMkYzQzFGNkNCNTczNURFMDAifQ==",
         }
     
     def _merge_headers(self, custom_headers: Optional[Dict[str, str]] = None) -> Dict[str, str]:
@@ -42,6 +42,7 @@ class FotMobHTTPClient:
         url: str,
         params: Optional[Dict[str, Any]] = None,
         headers: Optional[Dict[str, str]] = None,
+        raise_for_status: bool = True,
         **kwargs
     ) -> httpx.Response:
         """
@@ -51,6 +52,7 @@ class FotMobHTTPClient:
             url: 요청 URL (상대 경로 또는 전체 URL)
             params: 쿼리 파라미터
             headers: 추가/오버라이드할 헤더
+            raise_for_status: HTTP 에러 시 예외 발생 여부 (기본값: True)
             **kwargs: httpx.AsyncClient.get()에 전달할 추가 인자
             
         Returns:
@@ -70,6 +72,8 @@ class FotMobHTTPClient:
                 headers=merged_headers,
                 **kwargs
             )
+            if raise_for_status:
+                response.raise_for_status()
             return response
         finally:
             await client.aclose()

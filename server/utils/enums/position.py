@@ -8,6 +8,7 @@ class Position(str, Enum):
     CDM = "CDM"
     CM = "CM"
     AM = "AM"
+    CAM = "CAM"
     LM = "LM"
     RM = "RM"
     LW = "LW"
