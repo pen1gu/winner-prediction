@@ -7,9 +7,14 @@ from server.utils.logger import get_logger
 logger = get_logger(__name__)
 
 async def main():
-    crawler = FotMobCrawler()
-    players_info = await crawler.get_players_info_by_team_id(9825)
 
+    team_id = 9825
+
+    crawler = FotMobCrawler()
+    response = await crawler.get_team(team_id)
+    
+    team = await crawler.get_team_info_by_team_id(team_id, response)
+    players_info = await crawler.get_manager_info_by_team_id(team, response)
     print(players_info)
 
 if __name__ == "__main__":

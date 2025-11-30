@@ -3,11 +3,14 @@ from __future__ import annotations
 from sqlalchemy import Integer, String, ForeignKey, Date, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from server.utils.model.db_model import Model as DBModel, TimestampMixin
+from server.utils.model.db_model import DBModel, TimestampMixin
 
 
 class PlayerModel(TimestampMixin, DBModel):
     __tablename__ = "players"
+
+    # FotMob ID
+    fotmob_id: Mapped[int] = mapped_column(Integer, nullable=False)
 
     # 선수 이름
     name: Mapped[str] = mapped_column(String(255), nullable=False)

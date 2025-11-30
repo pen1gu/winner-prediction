@@ -27,7 +27,7 @@ class FotMobHTTPClient:
             "Accept": "application/json, text/plain, */*",
             "Accept-Language": f"{settings.fotmob_language}-KR,{settings.fotmob_language};q=0.9,en-US;q=0.8,en;q=0.7",
             "Referer": f"{settings.fotmob_base_url}/",
-            "x-mas": "eyJib2R5Ijp7InVybCI6Ii9hcGkvZGF0YS90ZWFtcz9pZD05ODI1JmNjb2RlMz1LT1IiLCJjb2RlIjoxNzY0MjA5MzE4NTg3LCJmb28iOiJwcm9kdWN0aW9uOjEzMjc0NzhiNTQwNjc3NTIzNjhlOWUwZGEzZWUzNjM5MGJjMGY3NzcifSwic2lnbmF0dXJlIjoiQjc4N0I0RTdFRkEwN0QyMkYzQzFGNkNCNTczNURFMDAifQ==",
+            "x-mas": "eyJib2R5Ijp7InVybCI6Ii9hcGkvZGF0YS90ZWFtcz9pZD05ODI1JmNjb2RlMz1LT1IiLCJjb2RlIjoxNzY0NTAxNjc4MDMxLCJmb28iOiJwcm9kdWN0aW9uOmQ4MDRhMTFiNTUzMmM1YTg4ZWVkZTkzZGVjZjFmM2RmZWU2MjAyNGEifSwic2lnbmF0dXJlIjoiNzdDMjAzOUQ1RDUyREYwOTNCOTBFMTRGNzI5NEQ3MjUifQ==",
         }
     
     def _merge_headers(self, custom_headers: Optional[Dict[str, str]] = None) -> Dict[str, str]:

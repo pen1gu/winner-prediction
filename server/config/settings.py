@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     log_format: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
     # 데이터베이스 설정 (PostgreSQL / Async)
-    database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/winner_prediction"
+    database_url: str = "postgresql+asyncpg://postgres:1234@localhost:5432/winner_prediction"
     database_echo: bool = False
     
     class Config:

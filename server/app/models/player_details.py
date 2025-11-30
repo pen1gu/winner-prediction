@@ -11,7 +11,6 @@ description: 변경될 가능성이 높은 선수 경력 상세 정보
 """
 
 class PlayerDetails(Model):
-    model_config = ConfigDict(from_attributes=True)
     player: Player = Field(default=Player())
 
     team: Team = Field(default=Team())

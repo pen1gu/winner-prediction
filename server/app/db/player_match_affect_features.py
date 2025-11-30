@@ -3,7 +3,7 @@ from __future__ import annotations
 from sqlalchemy import Integer, ForeignKey, Float, Boolean, JSON, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from server.utils.model.db_model import Model as DBModel, TimestampMixin
+from server.utils.model.db_model import DBModel, TimestampMixin
 
 
 class PlayerMatchAffectFeaturesModel(TimestampMixin, DBModel):

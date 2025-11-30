@@ -10,7 +10,8 @@ from server.utils.model.pydantic_model import Model
 description: 기본 선수 정보
 """
 class Player(Model):
-    model_config = ConfigDict(from_attributes=True)
+    # FotMob ID
+    fotmob_id: int = Field(default=0)
 
     # 이름  
     name: str = Field(default="")
@@ -39,6 +40,7 @@ class Player(Model):
     # 생년월일
     birth_date: Optional[datetime.datetime] = Field(default=None)
 
+    # TODO: 출생 관련 지역 등 어떻게 처리할지 고민 필요
     # 출생지
     birth_place: Optional[str] = Field(default=None)
 

@@ -7,11 +7,10 @@ from server.app.models.team import Team
 from server.app.models.player_details import PlayerDetails
 from server.utils.model.pydantic_model import Model
 """
-description: 선수 경기 영향 요소
+description: 외부적인 선수 경기 영향 요소
 """
 
 class PlayerMatchAffectFeatures(Model):
-    model_config = ConfigDict(from_attributes=True)
     player: Player = Field(default=Player())
 
     team: Team = Field(default=Team())

@@ -1,10 +1,14 @@
 from pydantic import BaseModel, Field, ConfigDict
+from typing import List
 from server.utils.model.pydantic_model import Model
+
 """
 description: 기본 팀 정보
 """
 class Team(Model):
-    model_config = ConfigDict(from_attributes=True)
+    # FotMob ID
+    fotmob_id: int = Field(default=0)
+    
     # 팀 이름
     name: str = Field(default="")
 
@@ -13,6 +17,9 @@ class Team(Model):
     
     # 리그
     league: str = Field(default="")
+
+    # 리그 ID
+    league_id: int = Field(default=0)
 
     # 창단 연도
     founded: int = Field(default=0)
@@ -24,10 +31,7 @@ class Team(Model):
     stadium_capacity: int = Field(default=0)
 
     # 경기장 위치
-    stadium_location: str = Field(default="")
-
-    # 경기장 주소
-    stadium_address: str = Field(default="")
+    stadium_location: List[float] = Field(default=[])
 
     # 경기장 도시
     stadium_city: str = Field(default="")
