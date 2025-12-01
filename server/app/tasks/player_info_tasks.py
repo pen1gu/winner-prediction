@@ -1,3 +1,0 @@
-tasks = [
-    "player_info",
-]

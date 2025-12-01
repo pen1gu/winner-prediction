@@ -1,0 +1,41 @@
+from server.app.crawler.fotmob import FotMobCrawler
+from server.app.models.team import Team
+from server.app.models.manager import Manager
+from server.utils.logger import get_logger
+
+logger = get_logger(__name__)
+
+
+async def fetch_team_overview_task(team_id: int) -> dict:
+    """
+    팀 ID를 받아서 팀 정보와 감독 정보를 가져오는 task
+    
+    Args:
+        team_id: FotMob 팀 ID
+        
+    Returns:
+        dict: 팀 정보와 감독 정보
+    """
+
+    crawler = FotMobCrawler()
+
+    response = await crawler.fetch_team_overview(team_id)
+    
+    team = await crawler.get_team_info_by_team_id(team_id, response)
+
+    players = await crawler.get_players_info_by_team_id(team, response)
+
+    manager = await crawler.get_manager_info_by_team_id(team, response)
+    
+    logger.info(f"Successfully fetched team and manager info for team_id: {team_id}")
+    
+    return {team_id: {
+        "team": team,
+        "players": players,
+        "manager": manager,
+    }}
+
+
+tasks = [
+    "fetch_team_overview",
+]
