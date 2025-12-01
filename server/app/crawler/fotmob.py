@@ -22,7 +22,7 @@ class FotMobCrawler:
         self.client = FotMobHTTPClient()
 
 
-    async def get_team(self, team_id: int):
+    async def fetch_team_overview(self, team_id: int):
         response = await self.client.get(
             "/data/teams",
             params={"id": team_id, "ccode3": "KOR"},
