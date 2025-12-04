@@ -7,7 +7,7 @@ from server.utils.model.db_model import DBModel, TimestampMixin
 
 
 class PlayerModel(TimestampMixin, DBModel):
-    __tablename__ = "players"
+    __tablename__ = "player"
 
     # FotMob ID
     fotmob_id: Mapped[int] = mapped_column(Integer, nullable=False)

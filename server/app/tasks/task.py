@@ -29,13 +29,17 @@ async def fetch_team_overview_task(team_id: int) -> dict:
     
     logger.info(f"Successfully fetched team and manager info for team_id: {team_id}")
     
-    return {team_id: {
-        "team": team,
-        "players": players,
-        "manager": manager,
-    }}
+    return {
+        team_id: {
+            "team": team,
+            "players": players,
+            "manager": manager,
+        }
+    }
 
 
 tasks = [
-    "fetch_team_overview",
+    {
+        "fetch_team_overview": fetch_team_overview_task,
+    },
 ]

@@ -10,7 +10,7 @@ from server.app.db.manager import ManagerModel
 
 
 class TeamModel(TimestampMixin, DBModel):
-    __tablename__ = "teams"
+    __tablename__ = "team"
 
     # FotMob ID
     fotmob_id: Mapped[int] = mapped_column(Integer, nullable=False)
