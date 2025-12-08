@@ -12,6 +12,8 @@ from server.app.models import (
     Manager,
 )
 
+from server.app.models.matches.match_logs import MatchLogs
+from server.app.models.matches.next_match import NextMatch
 from server.config.settings import settings
 from server.utils.http.requests import FotMobHTTPClient
 
@@ -23,7 +25,9 @@ class FotMobCrawler:
     def __init__(self):
         self.client = FotMobHTTPClient()
 
-
+    """
+    description: 팀 데이터가 한 번에 나오기 때문에 response 호출 후 반환하여 사용
+    """
     async def fetch_team_overview(self, team_id: int):
         response = await self.client.get(
             "/data/teams",
@@ -123,6 +127,26 @@ class FotMobCrawler:
         )
         return manager
 
-        
+    async def get_next_match_info_by_team_id(self, team_id: int, response: dict) -> NextMatch:
+        # TDOO: 개발 필요
+        next_match = response.get("nextMatch")
+
+        next_match = NextMatch(
+            fotmob_id=next_match.get("id"),
+            match_date=next_match.get("matchDate"),
+            home_win_rate=next_match.get("homeWinRate"),
+            away_win_rate=next_match.get("awayWinRate"),
+            draw_rate=next_match.get("drawRate"),
+        )
+
+
+    async def get_match_logs_info_by_team_id(self, team_id: int, response: dict) -> List[MatchLogs]:
+        # TODO: 개발 필요
+        match_logs = response.get("matchLogs")
+
+        match_logs = MatchLogs(
+            fotmob_id=match_logs.get("id"),
+            match_date=match_logs.get("matchDate"),
+        )
     
 player_info = FotMobCrawler()
