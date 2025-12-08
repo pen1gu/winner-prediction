@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-from server.app.models.team import Team
-from server.app.models.player import Player
-from server.app.models.manager import Manager
+from server.app.models import Team, Player, Manager
 
 
 def normalize_team_data(team: Team) -> dict:

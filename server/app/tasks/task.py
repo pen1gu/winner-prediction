@@ -1,8 +1,7 @@
 from server.app.crawler.fotmob import FotMobCrawler
-from server.app.models.team import Team
-from server.app.models.manager import Manager
+from server.app.models import Team, Manager
 from server.utils.logger import get_logger
-
+from server.app.store.db_store import save_team_overview
 logger = get_logger(__name__)
 
 
@@ -29,13 +28,11 @@ async def fetch_team_overview_task(team_id: int) -> dict:
     
     logger.info(f"Successfully fetched team and manager info for team_id: {team_id}")
     
-    return {
-        team_id: {
-            "team": team,
-            "players": players,
-            "manager": manager,
-        }
-    }
+    result = await save_team_overview(team, players, manager)
+
+    logger.info(f"Successfully saved team overview for team_id: {team_id}")
+
+    return result
 
 
 tasks = [

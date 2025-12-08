@@ -1,13 +1,13 @@
-from __future__ import annotations
-
 from typing import Optional, List, Dict, TYPE_CHECKING
-from datetime import datetime
 from sqlmodel import SQLModel, Field, Relationship, JSON, Column
+from sqlalchemy import ForeignKey, Integer
+
+from server.utils.model.db_model import TimestampMixin
 
 if TYPE_CHECKING:
-    from server.app.models.player import Player
-    from server.app.models.team import Team
-    from server.app.models.player_match_affect_features import PlayerMatchAffectFeatures
+    from .player import Player
+    from server.app.models.teams.team import Team
+    from .player_match_affect_features import PlayerMatchAffectFeatures
 
 
 class PlayerDetailsBase(SQLModel):
@@ -58,7 +58,7 @@ class PlayerDetailsBase(SQLModel):
     awards: Optional[List[Dict]] = Field(default=None, sa_column=Column(JSON))
 
 
-class PlayerDetails(PlayerDetailsBase, table=True):
+class PlayerDetails(PlayerDetailsBase, TimestampMixin, table=True):
     """선수 상세 정보 - SQLModel (DB + API)"""
     __tablename__ = "player_details"
     
@@ -66,16 +66,18 @@ class PlayerDetails(PlayerDetailsBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     
     # 선수 FK
-    player_id: int = Field(foreign_key="players.id", unique=True, sa_column_kwargs={"ondelete": "CASCADE"})
+    player_id: int = Field(sa_column=Column(Integer, ForeignKey("players.id", ondelete="CASCADE"), unique=True))
     
     # 팀 FK
-    team_id: Optional[int] = Field(default=None, foreign_key="teams.id", sa_column_kwargs={"ondelete": "SET NULL", "nullable": True})
-    
-    # Timestamps
-    created_at: Optional[datetime] = Field(default=None, sa_column_kwargs={"server_default": "now()"})
-    updated_at: Optional[datetime] = Field(default=None, sa_column_kwargs={"server_default": "now()", "onupdate": "now()"})
+    team_id: Optional[int] = Field(default=None, sa_column=Column(Integer, ForeignKey("teams.id", ondelete="SET NULL"), nullable=True))
     
     # Relationships
-    player: "Player" = Relationship(back_populates="details")
-    team: Optional["Team"] = Relationship(back_populates="details")
-    match_affect_features: List["PlayerMatchAffectFeatures"] = Relationship(back_populates="details")
+    player: "Player" = Relationship(
+        back_populates="details",
+        sa_relationship_kwargs={"lazy": "select"}
+    )
+    team: Optional["Team"] = Relationship(
+        back_populates="details",
+        sa_relationship_kwargs={"lazy": "select"}
+    )
+

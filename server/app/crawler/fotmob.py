@@ -4,11 +4,13 @@ import json
 import asyncio
 from playwright.async_api import async_playwright
 
-from server.app.models.player import Player
-from server.app.models.player_match_affect_features import PlayerMatchAffectFeatures
-from server.app.models.player_details import PlayerDetails
-from server.app.models.team import Team
-from server.app.models.manager import Manager
+from server.app.models import (
+    Player,
+    PlayerMatchAffectFeatures,
+    PlayerDetails,
+    Team,
+    Manager,
+)
 
 from server.config.settings import settings
 from server.utils.http.requests import FotMobHTTPClient

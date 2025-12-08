@@ -1,30 +1,19 @@
 from __future__ import annotations
 
-from sqlalchemy import DateTime, func, Integer
-from sqlalchemy.orm import DeclarativeBase, declared_attr, Mapped, mapped_column
-
-
-class DBModel(DeclarativeBase):
-    """Common SQLAlchemy declarative base."""
-
-    # 고유 ID
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, nullable=False)
-
-    @declared_attr.directive
-    def __tablename__(cls) -> str:
-        return cls.__name__.lower()
+from typing import Optional
+from datetime import datetime
+from sqlmodel import Field
 
 
 class TimestampMixin:
-    """Adds created_at / updated_at timestamp columns."""
+    """Adds created_at / updated_at timestamp columns (SQLModel용 - 기본)."""
 
-    created_at: Mapped[DateTime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
+    created_at: Optional[datetime] = Field(
+        default=None, 
+        sa_column_kwargs={"server_default": "now()"}
     )
-    updated_at: Mapped[DateTime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        onupdate=func.now(),
-        nullable=False,
+    updated_at: Optional[datetime] = Field(
+        default=None, 
+        sa_column_kwargs={"server_default": "now()", "onupdate": "now()"}
     )
 

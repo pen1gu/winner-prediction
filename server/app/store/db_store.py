@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-from typing import List
+from typing import List, Dict, Any, Union
+from sqlmodel import SQLModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from server.app.models.team import Team
-from server.app.models.player import Player
-from server.app.models.manager import Manager
-from server.app.db.session import get_session
+from server.app.models import Team, Player, Manager
+from server.app.models.session import get_session
 from server.utils.logger import get_logger
 from server.utils.nomalize.normalize import (
     normalize_team_data,
@@ -125,7 +124,6 @@ async def save_team_overview(
         
         logger.info(
             f"Successfully saved team overview: team_id={team_id}, "
-            f"manager_id={manager_db.id}, players_count={len(saved_player_ids)}"
         )
         
         return {
@@ -141,3 +139,41 @@ async def save_team_overview(
     finally:
         if should_close_session:
             await session.close()
+
+async def store(data: Union[Dict, List[SQLModel], SQLModel, None]):
+    """
+    어떤 데이터 형식이든 DB에 덮어씌워 저장할 수 있도록 처리하는 함수.
+    
+    지원 형식:
+    1. Task 결과 Dict ({team_id: {team: Team, players: [Player], manager: Manager}})
+    2. SQLModel 인스턴스 (단일)
+    3. List[SQLModel] (리스트)
+    """
+    if not data:
+        return
+
+    # 1. Task 결과 Dict 처리
+    if isinstance(data, dict):
+        if not data:
+            return
+            
+    # 2. SQLModel 처리 (단일 또는 리스트)
+    session_gen = get_session()
+    session = await session_gen.__anext__()
+    
+    try:
+        if isinstance(data, SQLModel):
+            await session.merge(data)
+            
+        elif isinstance(data, list) and data and isinstance(data[0], SQLModel):
+            for item in data:
+                await session.merge(item)
+        
+        await session.commit()
+        
+    except Exception as e:
+        await session.rollback()
+        logger.error(f"Store failed: {e}")
+        raise e
+    finally:
+        await session.close()

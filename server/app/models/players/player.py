@@ -1,16 +1,14 @@
-from __future__ import annotations
-
 from typing import Optional, List, Dict, TYPE_CHECKING
-from datetime import datetime
 from sqlmodel import SQLModel, Field, Relationship, JSON, Column
-from sqlalchemy import String
+from sqlalchemy import String, ForeignKey, Integer
 
 from server.utils.enums import Position
+from server.utils.model.db_model import TimestampMixin
 
 if TYPE_CHECKING:
-    from server.app.models.team import Team
-    from server.app.models.player_details import PlayerDetails
-    from server.app.models.player_match_affect_features import PlayerMatchAffectFeatures
+    from server.app.models.teams.team import Team
+    from .player_details import PlayerDetails
+    from .player_match_affect_features import PlayerMatchAffectFeatures
 
 
 class PlayerBase(SQLModel):
@@ -52,7 +50,7 @@ class PlayerBase(SQLModel):
     birth_state: Optional[str] = Field(default=None, max_length=128)
 
 
-class Player(PlayerBase, table=True):
+class Player(PlayerBase, TimestampMixin, table=True):
     """선수 정보 - SQLModel (DB + API)"""
     __tablename__ = "players"
     
@@ -60,19 +58,19 @@ class Player(PlayerBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     
     # 소속 팀 (Foreign Key)
-    team_id: Optional[int] = Field(default=None, foreign_key="teams.id", sa_column_kwargs={"ondelete": "SET NULL"})
-    
-    # Timestamps
-    created_at: Optional[datetime] = Field(default=None, sa_column_kwargs={"server_default": "now()"})
-    updated_at: Optional[datetime] = Field(default=None, sa_column_kwargs={"server_default": "now()", "onupdate": "now()"})
+    team_id: Optional[int] = Field(default=None, sa_column=Column(Integer, ForeignKey("teams.id", ondelete="SET NULL")))
     
     # Relationships
-    team: Optional["Team"] = Relationship(back_populates="players")
+    team: Optional["Team"] = Relationship(
+        back_populates="players",
+        sa_relationship_kwargs={"lazy": "select"}
+    )
     details: Optional["PlayerDetails"] = Relationship(
         back_populates="player",
-        sa_relationship_kwargs={"uselist": False, "cascade": "all, delete-orphan"}
+        sa_relationship_kwargs={"uselist": False, "cascade": "all, delete-orphan", "lazy": "select"}
     )
     match_affect_features: List["PlayerMatchAffectFeatures"] = Relationship(
         back_populates="player",
-        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+        sa_relationship_kwargs={"cascade": "all, delete-orphan", "lazy": "select"}
     )
+
