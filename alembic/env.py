@@ -8,16 +8,16 @@ from alembic import context
 from alembic.config import Config
 
 from server.config.settings import settings
-from server.utils.model.db_model import DBModel
+from sqlmodel import SQLModel
 
-# Import all models to ensure they are registered with DBModel.metadata
-from server.app.db import (  # noqa: F401
-    TeamModel,
-    PlayerModel,
-    PlayerDetailsModel,
-    PlayerMatchAffectFeaturesModel,
+# Import all models to ensure they are registered with SQLModel metadata
+from server.app.models import (  # noqa: F401
+    Team,
+    Player,
+    PlayerDetails,
+    PlayerMatchAffectFeatures,
+    Manager,
 )
-from server.app.db.manager import ManagerModel  # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -30,7 +30,7 @@ if config.config_file_name is not None:
 
 # add your model's MetaData object here
 # for 'autogenerate' support
-target_metadata = DBModel.metadata
+target_metadata = SQLModel.metadata
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:

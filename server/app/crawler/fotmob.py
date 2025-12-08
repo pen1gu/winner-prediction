@@ -4,11 +4,13 @@ import json
 import asyncio
 from playwright.async_api import async_playwright
 
-from server.app.models.player import Player
-from server.app.models.player_match_affect_features import PlayerMatchAffectFeatures
-from server.app.models.player_details import PlayerDetails
-from server.app.models.team import Team
-from server.app.models.manager import Manager
+from server.app.models import (
+    Player,
+    PlayerMatchAffectFeatures,
+    PlayerDetails,
+    Team,
+    Manager,
+)
 
 from server.config.settings import settings
 from server.utils.http.requests import FotMobHTTPClient
@@ -44,18 +46,21 @@ class FotMobCrawler:
         players = []
         for players_info in squad:
             for player_info in players_info.get("members"):
+                # position을 문자열 리스트로 변환
+                position_str = player_info.get("positionIdsDesc", "")
+                position_list = [p.strip() for p in position_str.split(",")] if position_str else None
+                
                 players.append(
                     Player(
                         fotmob_id=player_info.get("id"),
                         name=player_info.get("name"),
                         age=player_info.get("age"),
-                        team=team,
-                        position=player_info.get("positionIdsDesc").split(","),
+                        position=position_list,
                         role=player_info.get("role"),
                         shirt_number=player_info.get("shirtNumber"),
                         height=player_info.get("height"),
                         weight=0, # TODO: 관련 정보가 따로 없음, 체형 데이터를 넣는게 좋을까?
-                        birth_date=player_info.get("dateOfBirth"),
+                        birth_date=str(player_info.get("dateOfBirth")) if player_info.get("dateOfBirth") else None,
                         birth_place=player_info.get("cname"),
                         birth_country=player_info.get("cname"),
                         birth_state=player_info.get("cname"),
@@ -87,6 +92,11 @@ class FotMobCrawler:
         team_details = response.get("details")
         team_overview = response.get("overview").get("venue")
 
+        # stadium_location을 문자열로 변환 (List[float] -> str)
+        stadium_location = team_overview.get("widget").get("location")
+        if isinstance(stadium_location, list):
+            stadium_location = str(stadium_location)
+        
         team = Team(
             fotmob_id=team_id,
             name=team_details.get("name"),
@@ -96,7 +106,7 @@ class FotMobCrawler:
             founded=team_overview.get("statPairs")[2][1],
             stadium=team_overview.get("widget").get("name"),
             stadium_capacity=team_overview.get("statPairs")[1][1],
-            stadium_location=team_overview.get("widget").get("location"),
+            stadium_location=stadium_location,
             stadium_city=team_overview.get("widget").get("city"),
         )
 
@@ -110,7 +120,6 @@ class FotMobCrawler:
             name=manager_details.get("name"),
             age=manager_details.get("age"),
             country=manager_details.get("cname"),
-            team=team,
         )
         return manager
 
