@@ -1,6 +1,8 @@
 from typing import Optional
 from sqlmodel import SQLModel, Field
 
+from server.utils.model.db_model import TimestampMixin
+
 class BetsBase(SQLModel):
     """Bet 기본 정보"""
     # FotMob ID
@@ -13,6 +15,7 @@ class BetsBase(SQLModel):
     age: Optional[int] = Field(default=None)
 
 
-class Bets(BetsBase, table=True):
+class Bets(BetsBase, TimestampMixin, table=True):
     __tablename__ = "bets"
 
+    id: Optional[int] = Field(default=None, primary_key=True)
