@@ -25,7 +25,7 @@ class ManagerBase(SQLModel):
 # TODO: Manager Details 추가 필요
 class Manager(ManagerBase, TimestampMixin, table=True):
     """감독 정보 - SQLModel (DB + API)"""
-    __tablename__ = "manager"
+    __tablename__ = "managers"
     
     # Primary Key
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -35,7 +35,7 @@ class Manager(ManagerBase, TimestampMixin, table=True):
     
     # Relationships
     team: Optional["Team"] = Relationship(
-        back_populates="manager",
+        back_populates="managers",
         sa_relationship_kwargs={"lazy": "select"}
     )
 
