@@ -27,7 +27,7 @@ class FotMobHTTPClient:
             "Accept": "application/json, text/plain, */*",
             "Accept-Language": f"{settings.fotmob_language}-KR,{settings.fotmob_language};q=0.9,en-US;q=0.8,en;q=0.7",
             "Referer": f"{settings.fotmob_base_url}/",
-            "x-mas": "eyJib2R5Ijp7InVybCI6Ii9hcGkvZGF0YS90ZWFtLW9mLXRoZS13ZWVrL3RlYW0/bGVhZ3VlSWQ9NDcmcm91bmRJZD0xNCZzZWFzb249MjAyNSUyRjIwMjYiLCJjb2RlIjoxNzY0OTI0NjA4NjY0LCJmb28iOiJwcm9kdWN0aW9uOmFiYmI0ODA4NDIyZjBlZjViZmNhNGJlMmRiOGM3MzJjMGRjMGJhYjkifSwic2lnbmF0dXJlIjoiN0I2QkM5RTE1MjU5NTIyNjE4MUIyREYyM0M0MTJFQ0EifQ==",
+            "x-mas": "eyJib2R5Ijp7InVybCI6Ii9hcGkvZGF0YS9tYXRjaGVzP2RhdGU9MjAyNTEyMTYmdGltZXpvbmU9QXNpYSUyRlNlb3VsJmNjb2RlMz1LT1IiLCJjb2RlIjoxNzY1ODk1MTI3NDQxLCJmb28iOiJwcm9kdWN0aW9uOjkyNTE4ZTQ2OTYwZTBlNzA1NjQ1NmZkMmRlNzQ3M2MxOTAzZDRlZTIifSwic2lnbmF0dXJlIjoiQjM4Nzc4MzhDM0JDRTc3ODQzMkY0ODBCRDc2MTVFOEYifQ==",
         }
     
     def _merge_headers(self, custom_headers: Optional[Dict[str, str]] = None) -> Dict[str, str]:

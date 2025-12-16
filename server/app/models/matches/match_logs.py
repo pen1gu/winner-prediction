@@ -7,6 +7,7 @@ from server.utils.model.db_model import TimestampMixin
 
 class MatchLogsBase(SQLModel):
     """MatchLogs 기본 정보 (공통 필드)"""
+    # TODO: 나중에 fotmob id 날리고 그냥 이걸 id 로 사용할지 고려 필요
     fotmob_id: int = Field(nullable=False, index=True)
     
     match_date: datetime.datetime = Field(nullable=False)
@@ -15,8 +16,13 @@ class MatchLogsBase(SQLModel):
 
     away_score: int = Field(nullable=False)
 
+    # 다음 경기인지 아닌지
+    next_match: bool = Field(nullable=False)
+
+    # False 진행 중, True 종료
     finished: bool = Field(nullable=False)
 
+    # False 취소, True 진행
     cancelled: bool = Field(nullable=False)
     
 class MatchLogs(MatchLogsBase, TimestampMixin, table=True):

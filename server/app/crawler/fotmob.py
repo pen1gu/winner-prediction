@@ -13,7 +13,6 @@ from server.app.models import (
 )
 
 from server.app.models.matches.match_logs import MatchLogs
-from server.app.models.matches.next_match import NextMatch
 from server.config.settings import settings
 from server.utils.http.requests import FotMobHTTPClient
 
@@ -127,17 +126,20 @@ class FotMobCrawler:
         )
         return manager
 
-    async def get_next_match_info_by_team_id(self, team_id: int, response: dict) -> NextMatch:
-        # TDOO: 개발 필요
-        next_match = response.get("nextMatch")
+    async def get_next_match_info_by_match_id(self, match_id: int) -> MatchLogs:
 
-        next_match = NextMatch(
-            fotmob_id=next_match.get("id"),
-            match_date=next_match.get("matchDate"),
-            home_win_rate=next_match.get("homeWinRate"),
-            away_win_rate=next_match.get("awayWinRate"),
-            draw_rate=next_match.get("drawRate"),
+        response = await self.client.get(
+            "/data/match",
+            params={"id": match_id},
+            raise_for_status=False
         )
+
+        if response.status_code != 200:
+            raise Exception(f"Failed to get next match info: {response.status_code} - {response.text}")
+
+        logger.info(f"Next match info: {response.json()}")
+
+        return
 
 
     async def get_match_logs_info_by_team_id(self, team_id: int, response: dict) -> List[MatchLogs]:
