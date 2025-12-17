@@ -41,8 +41,6 @@ class TeamBase(SQLModel):
     
     # 경기장 도시
     stadium_city: Optional[str] = Field(default=None, max_length=128)
-
-
 class Team(TeamBase, TimestampMixin, table=True):
     """팀 정보 - SQLModel (DB + API)"""
     __tablename__ = "teams"
@@ -57,7 +55,7 @@ class Team(TeamBase, TimestampMixin, table=True):
         back_populates="team",
         sa_relationship_kwargs={"cascade": "all, delete-orphan", "lazy": "select"}
     )
-    manager: Optional["Manager"] = Relationship(
+    managers: Optional["Manager"] = Relationship(
         back_populates="team",
         sa_relationship_kwargs={"lazy": "select"}
     )
@@ -69,4 +67,3 @@ class Team(TeamBase, TimestampMixin, table=True):
         back_populates="team",
         sa_relationship_kwargs={"lazy": "select"}
     )
-

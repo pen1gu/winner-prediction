@@ -35,6 +35,10 @@ async def fetch_team_overview_task(team_id: int) -> dict:
     return result
 
 
+async def fetch_matches_by_team_id_task(team_id: int) -> dict:
+    # TODO: 중복 제거 반드시 필요
+    pass
+
 tasks = [
     {
         "fetch_team_overview": fetch_team_overview_task,
