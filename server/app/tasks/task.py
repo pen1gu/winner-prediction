@@ -36,7 +36,7 @@ async def fetch_team_overview_task(team_id: int) -> dict:
 
 
 async def fetch_matches_by_team_id_task(team_id: int) -> dict:
-    # TODO: 매치 크롤링 시 중복 제거 반드시 필요
+    # TODO: 매치 크롤링 시 중복 제거 반드시 필요 t
     pass
 
 tasks = [
