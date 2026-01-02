@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 class PlayerBase(SQLModel):
     """선수 기본 정보"""
     # FotMob ID
-    fotmob_id: int = Field(nullable=False, index=True)
+    fotmob_id: int = Field(nullable=False, index=True, unique=True)
     
     # 이름
     name: str = Field(max_length=255, nullable=False)

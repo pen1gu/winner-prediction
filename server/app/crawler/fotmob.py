@@ -2,8 +2,10 @@ from typing import List
 import httpx
 import json
 import asyncio
+from datetime import datetime, timezone
 from playwright.async_api import async_playwright
 
+from server.app.store.saveable import SaveableList
 from server.app.models import (
     Player,
     PlayerMatchAffectFeatures,
@@ -21,6 +23,8 @@ from server.utils.logger import get_logger
 logger = get_logger(__name__)
 
 class FotMobCrawler:
+
+    # 크롤링은 가능하면 매일 진행할 예정
     def __init__(self):
         self.client = FotMobHTTPClient()
 
@@ -46,7 +50,7 @@ class FotMobCrawler:
     async def get_players_info_by_team_id(self, team: Team, response: dict) -> List[Player]:
         squad = response.get("squad").get("squad")[1:]
 
-        players = []
+        players: SaveableList[Player] = SaveableList()
         for players_info in squad:
             for player_info in players_info.get("members"):
                 # position을 문자열 리스트로 변환
@@ -127,6 +131,7 @@ class FotMobCrawler:
         return manager
 
     async def get_next_match_info_by_match_id(self, match_id: int) -> MatchLogs:
+        # TODO: 이건 나중에 특정 매치만 검색하는 기능이 필요하다 싶으면 개발
 
         response = await self.client.get(
             "/data/match",
@@ -141,14 +146,93 @@ class FotMobCrawler:
 
         return
 
-
     async def get_match_logs_info_by_team_id(self, team_id: int, response: dict) -> List[MatchLogs]:
-        # TODO: 개발 필요
-        match_logs = response.get("matchLogs")
+        # TODO: 이거 되는지 검증 필요
+        fixtures = response.get("fixtures", {})
+        all_fixtures = fixtures.get("allFixtures", {})
+        match_logs_data = all_fixtures.get("fixtures", [])
+        next_match_data = all_fixtures.get("nextMatch")
+        
+        if not match_logs_data:
+            return SaveableList()
+        
+        match_logs: SaveableList[MatchLogs] = SaveableList()
+        current_date = datetime.now(timezone.utc)
+        
+        # nextMatch의 id를 추출하여 next_match 판단에 사용
+        next_match_id = next_match_data.get("id") if next_match_data else None
+        
+        for match_data in match_logs_data:
+            # status 정보 추출
+            status = match_data.get("status", {})
+            if not status:
+                logger.warning(f"Status is missing for match {match_data.get('id')}")
+                continue
+            
+            # utcTime 파싱: ISO 형식 (예: '2025-07-23T11:30:00.000Z')
+            utc_time_str = status.get("utcTime")
+            if not utc_time_str:
+                logger.warning(f"utcTime is missing for match {match_data.get('id')}")
+                continue
+            
+            try:
+                # ISO 형식 파싱 (Z는 UTC를 의미)
+                if utc_time_str.endswith('Z'):
+                    match_date = datetime.fromisoformat(utc_time_str.replace('Z', '+00:00'))
+                else:
+                    match_date = datetime.fromisoformat(utc_time_str)
+            except ValueError as e:
+                logger.warning(f"Failed to parse utcTime: {utc_time_str}, error: {e}")
+                continue
 
-        match_logs = MatchLogs(
-            fotmob_id=match_logs.get("id"),
-            match_date=match_logs.get("matchDate"),
-        )
+            # naive/aware 혼재 방지: 항상 UTC timezone-aware로 정규화
+            if match_date.tzinfo is None:
+                match_date = match_date.replace(tzinfo=timezone.utc)
+            else:
+                match_date = match_date.astimezone(timezone.utc)
+            
+            # status 정보 추출
+            finished = status.get("finished", False)
+            cancelled = status.get("cancelled", False)
+            not_started = match_data.get("notStarted", False)
+            
+            # next_match 판단: nextMatch의 id와 일치하거나, 아직 시작하지 않았고 현재 날짜보다 미래인 경우
+            match_id = match_data.get("id")
+            is_next_match = (next_match_id is not None and match_id == next_match_id) or (not_started and match_date > current_date)
+            
+            # home, away 팀 정보 추출
+            home_team = match_data.get("home", {})
+            away_team = match_data.get("away", {})
+            
+            home_team_id = home_team.get("id")
+            away_team_id = away_team.get("id")
+            
+            if not home_team_id or not away_team_id:
+                logger.warning(f"Team IDs are missing for match {match_id}")
+                continue
+            
+            # 점수 추출 (home.score, away.score)
+            home_score = home_team.get("score", 0)
+            away_score = away_team.get("score", 0)
+            
+            match_log = MatchLogs(
+                fotmob_id=match_id,
+                match_date=match_date,
+                home_score=home_score,
+                away_score=away_score,
+                next_match=is_next_match,
+                finished=finished,
+                cancelled=cancelled,
+                home_team_id=home_team_id,
+                away_team_id=away_team_id,
+            )
+            
+            match_logs.append(match_log)
+        
+        return match_logs
     
+
+    async def get_previos_matchs_by_team_id(self, team_id: int) -> List[MatchLogs]:
+        pass
+
 player_info = FotMobCrawler()
