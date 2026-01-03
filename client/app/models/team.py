@@ -4,7 +4,6 @@ from pydantic import BaseModel
 
 class Team(BaseModel):
     id: int
-    fotmob_id: int
     name: str
     score: Optional[int] = None
     founded: Optional[int] = None

@@ -1,16 +1,23 @@
 import datetime
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 from sqlmodel import SQLModel, Field, Relationship
+import sqlalchemy as sa
 
-from server.app.models.teams.team import Team
-from server.utils.model.db_model import TimestampMixin 
+from server.utils.model.db_model import TimestampMixin
+
+if TYPE_CHECKING:
+    from server.app.models.teams.team import Team
+    from .match_details import MatchDetails
 
 class MatchLogsBase(SQLModel):
     """MatchLogs 기본 정보 (공통 필드)"""
-    # TODO: 나중에 fotmob id 날리고 그냥 이걸 id 로 사용할지 고려 필요
-    fotmob_id: int = Field(nullable=False, index=True)
+    # FotMob ID를 id(PK)로 사용
+    id: int = Field(primary_key=True, index=True)
     
-    match_date: datetime.datetime = Field(nullable=False)
+    match_date: datetime.datetime = Field(
+        sa_type=sa.DateTime(timezone=True), 
+        nullable=False
+    )
     
     home_score: int = Field(nullable=False)
 
@@ -28,8 +35,7 @@ class MatchLogsBase(SQLModel):
 class MatchLogs(MatchLogsBase, TimestampMixin, table=True):
     __tablename__ = "match_logs"
     
-    id: Optional[int] = Field(default=None, primary_key=True)
-
+    # FK (teams.id 참조)
     home_team_id: int = Field(foreign_key="teams.id")
     away_team_id: int = Field(foreign_key="teams.id")
 
@@ -38,4 +44,9 @@ class MatchLogs(MatchLogsBase, TimestampMixin, table=True):
     )
     away_team: "Team" = Relationship(
         sa_relationship_kwargs={"primaryjoin": "MatchLogs.away_team_id==Team.id"}
+    )
+
+    match_details: Optional["MatchDetails"] = Relationship(
+        back_populates="match_logs",
+        sa_relationship_kwargs={"uselist": False, "lazy": "select"},
     )

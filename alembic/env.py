@@ -11,13 +11,8 @@ from server.config.settings import settings
 from sqlmodel import SQLModel
 
 # Import all models to ensure they are registered with SQLModel metadata
-from server.app.models import (  # noqa: F401
-    Team,
-    Player,
-    PlayerDetails,
-    PlayerMatchAffectFeatures,
-    Manager,
-)
+# NOTE: matches/bets 등 하위 폴더 모델도 여기서 import되어야 autogenerate에 잡힙니다.
+from server.app.models import *
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

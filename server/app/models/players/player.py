@@ -2,7 +2,6 @@ from typing import Optional, List, Dict, TYPE_CHECKING
 from sqlmodel import SQLModel, Field, Relationship, JSON, Column
 from sqlalchemy import String, ForeignKey, Integer
 
-from server.utils.enums import Position
 from server.utils.model.db_model import TimestampMixin
 
 if TYPE_CHECKING:
@@ -10,11 +9,10 @@ if TYPE_CHECKING:
     from .player_details import PlayerDetails
     from .player_match_affect_features import PlayerMatchAffectFeatures
 
-
 class PlayerBase(SQLModel):
     """선수 기본 정보"""
-    # FotMob ID
-    fotmob_id: int = Field(nullable=False, index=True)
+    # FotMob ID를 id(PK)로 사용
+    id: int = Field(primary_key=True, index=True)
     
     # 이름
     name: str = Field(max_length=255, nullable=False)
@@ -54,10 +52,7 @@ class Player(PlayerBase, TimestampMixin, table=True):
     """선수 정보 - SQLModel (DB + API)"""
     __tablename__ = "players"
     
-    # Primary Key
-    id: Optional[int] = Field(default=None, primary_key=True)
-    
-    # 소속 팀 (Foreign Key)
+    # 소속 팀 FK (teams.id 참조)
     team_id: Optional[int] = Field(default=None, sa_column=Column(Integer, ForeignKey("teams.id", ondelete="SET NULL")))
     
     # Relationships
@@ -73,4 +68,3 @@ class Player(PlayerBase, TimestampMixin, table=True):
         back_populates="player",
         sa_relationship_kwargs={"cascade": "all, delete-orphan", "lazy": "select"}
     )
-

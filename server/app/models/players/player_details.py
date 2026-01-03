@@ -7,8 +7,6 @@ from server.utils.model.db_model import TimestampMixin
 if TYPE_CHECKING:
     from .player import Player
     from server.app.models.teams.team import Team
-    from .player_match_affect_features import PlayerMatchAffectFeatures
-
 
 class PlayerDetailsBase(SQLModel):
     """선수 상세 정보 기본"""
@@ -62,13 +60,12 @@ class PlayerDetails(PlayerDetailsBase, TimestampMixin, table=True):
     """선수 상세 정보 - SQLModel (DB + API)"""
     __tablename__ = "player_details"
     
-    # Primary Key
     id: Optional[int] = Field(default=None, primary_key=True)
     
-    # 선수 FK
+    # 선수 FK (players.id 참조)
     player_id: int = Field(sa_column=Column(Integer, ForeignKey("players.id", ondelete="CASCADE"), unique=True))
     
-    # 팀 FK
+    # 팀 FK (teams.id 참조)
     team_id: Optional[int] = Field(default=None, sa_column=Column(Integer, ForeignKey("teams.id", ondelete="SET NULL"), nullable=True))
     
     # Relationships
@@ -80,4 +77,3 @@ class PlayerDetails(PlayerDetailsBase, TimestampMixin, table=True):
         back_populates="details",
         sa_relationship_kwargs={"lazy": "select"}
     )
-
