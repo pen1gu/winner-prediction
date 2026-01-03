@@ -1,5 +1,4 @@
 from __future__ import annotations
-
 from contextlib import asynccontextmanager
 from typing import Type, AsyncIterator, Iterable
 from sqlmodel import SQLModel
@@ -7,7 +6,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from server.app.models.session import get_session
-
 
 async def upsert_model(
     session: AsyncSession,
@@ -20,37 +18,31 @@ async def upsert_model(
     table = model.__table__  # type: ignore[attr-defined]
 
     data = obj.model_dump(exclude_none=True)
+    
+    # 기본 충돌 컬럼을 id로 설정 (이제 fotmob_id가 id로 바뀌었으므로)
     if conflict_cols is None:
-        conflict_cols = ["fotmob_id"] if "fotmob_id" in data else []
+        conflict_cols = ["id"] if "id" in data else []
 
     if conflict_cols:
         stmt = pg_insert(table).values(**data)
         excluded = stmt.excluded  # type: ignore[attr-defined]
-        update_cols = {k: getattr(excluded, k) for k in data.keys() if k not in conflict_cols and k != "id"}
+        
+        # PK(id)를 제외한 나머지 컬럼 업데이트
+        update_cols = {k: getattr(excluded, k) for k in data.keys() if k not in conflict_cols}
 
-        pk_cols = list(table.primary_key.columns)
-        if len(pk_cols) == 1:
+        if update_cols:
             stmt = stmt.on_conflict_do_update(  # type: ignore[attr-defined]
                 index_elements=conflict_cols,
                 set_=update_cols,
-            ).returning(pk_cols[0])
-            result = await session.execute(stmt)
-            pk_value = result.scalar_one_or_none()
-            if pk_value is not None:
-                persisted = await session.get(model, pk_value)
-                if persisted is not None:
-                    return persisted
-            return obj
-
-        stmt = stmt.on_conflict_do_update(  # type: ignore[attr-defined]
-            index_elements=conflict_cols,
-            set_=update_cols,
-        )
+            )
+        else:
+            # 업데이트할 컬럼이 없으면 아무것도 안 함
+            stmt = stmt.on_conflict_do_nothing(index_elements=conflict_cols) # type: ignore[attr-defined]
+            
         await session.execute(stmt)
         return obj
 
     return await session.merge(obj)
-
 
 async def save(
     data: SQLModel | Iterable[SQLModel],
@@ -70,7 +62,6 @@ async def save(
         except Exception:
             await session.rollback()
             raise
-
 
 @asynccontextmanager
 async def _ensure_session(
