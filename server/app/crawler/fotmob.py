@@ -5,7 +5,6 @@ import asyncio
 from datetime import datetime, timezone
 from playwright.async_api import async_playwright
 
-from server.app.store.saveable import SaveableList
 from server.app.models import (
     Player,
     PlayerMatchAffectFeatures,
@@ -50,7 +49,7 @@ class FotMobCrawler:
     async def get_players_info_by_team_id(self, team: Team, response: dict) -> List[Player]:
         squad = response.get("squad").get("squad")[1:]
 
-        players: SaveableList[Player] = SaveableList()
+        players = []
         for players_info in squad:
             for player_info in players_info.get("members"):
                 # position을 문자열 리스트로 변환
@@ -154,9 +153,9 @@ class FotMobCrawler:
         next_match_data = all_fixtures.get("nextMatch")
         
         if not match_logs_data:
-            return SaveableList()
+            return []
         
-        match_logs: SaveableList[MatchLogs] = SaveableList()
+        match_logs = []
         current_date = datetime.now(timezone.utc)
         
         # nextMatch의 id를 추출하여 next_match 판단에 사용
