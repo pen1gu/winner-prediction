@@ -7,8 +7,6 @@ from server.utils.model.db_model import TimestampMixin
 if TYPE_CHECKING:
     from .player import Player
     from server.app.models.teams.team import Team
-    from .player_match_affect_features import PlayerMatchAffectFeatures
-
 
 class PlayerDetailsBase(SQLModel):
     """선수 상세 정보 기본"""
@@ -80,4 +78,3 @@ class PlayerDetails(PlayerDetailsBase, TimestampMixin, table=True):
         back_populates="details",
         sa_relationship_kwargs={"lazy": "select"}
     )
-

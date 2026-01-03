@@ -9,7 +9,6 @@ if TYPE_CHECKING:
     from server.app.models.players.player_details import PlayerDetails
     from server.app.models.players.player_match_affect_features import PlayerMatchAffectFeatures
 
-
 class TeamBase(SQLModel):
     """팀 기본 정보"""
     # FotMob ID
@@ -41,6 +40,7 @@ class TeamBase(SQLModel):
     
     # 경기장 도시
     stadium_city: Optional[str] = Field(default=None, max_length=128)
+
 class Team(TeamBase, TimestampMixin, table=True):
     """팀 정보 - SQLModel (DB + API)"""
     __tablename__ = "teams"
@@ -49,8 +49,6 @@ class Team(TeamBase, TimestampMixin, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     
     # Relationships
-    # NOTE: from __future__ import annotations 때문에 타입이 문자열로 평가되므로
-    # Relationship에 명시적으로 타입을 지정하지 않고 타입 힌트만 사용
     players: List["Player"] = Relationship(
         back_populates="team",
         sa_relationship_kwargs={"cascade": "all, delete-orphan", "lazy": "select"}
@@ -59,10 +57,12 @@ class Team(TeamBase, TimestampMixin, table=True):
         back_populates="team",
         sa_relationship_kwargs={"lazy": "select"}
     )
+
     details: List["PlayerDetails"] = Relationship(
         back_populates="team",
         sa_relationship_kwargs={"lazy": "select"}
     )
+
     match_affect_features: List["PlayerMatchAffectFeatures"] = Relationship(
         back_populates="team",
         sa_relationship_kwargs={"lazy": "select"}

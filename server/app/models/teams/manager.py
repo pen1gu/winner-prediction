@@ -7,7 +7,6 @@ from server.utils.model.db_model import TimestampMixin
 if TYPE_CHECKING:
     from .team import Team
 
-
 class ManagerBase(SQLModel):
     """감독 기본 정보"""
     # FotMob ID
@@ -22,7 +21,7 @@ class ManagerBase(SQLModel):
     # 국가
     country: Optional[str] = Field(default=None, max_length=128)
 
-# TODO: Manager Details 추가 필요
+
 class Manager(ManagerBase, TimestampMixin, table=True):
     """감독 정보 - SQLModel (DB + API)"""
     __tablename__ = "managers"
@@ -38,4 +37,3 @@ class Manager(ManagerBase, TimestampMixin, table=True):
         back_populates="managers",
         sa_relationship_kwargs={"lazy": "select"}
     )
-

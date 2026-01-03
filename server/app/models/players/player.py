@@ -2,14 +2,12 @@ from typing import Optional, List, Dict, TYPE_CHECKING
 from sqlmodel import SQLModel, Field, Relationship, JSON, Column
 from sqlalchemy import String, ForeignKey, Integer
 
-from server.utils.enums import Position
 from server.utils.model.db_model import TimestampMixin
 
 if TYPE_CHECKING:
     from server.app.models.teams.team import Team
     from .player_details import PlayerDetails
     from .player_match_affect_features import PlayerMatchAffectFeatures
-
 
 class PlayerBase(SQLModel):
     """선수 기본 정보"""
@@ -73,4 +71,3 @@ class Player(PlayerBase, TimestampMixin, table=True):
         back_populates="player",
         sa_relationship_kwargs={"cascade": "all, delete-orphan", "lazy": "select"}
     )
-
