@@ -11,8 +11,8 @@ if TYPE_CHECKING:
 
 class MatchLogsBase(SQLModel):
     """MatchLogs 기본 정보 (공통 필드)"""
-    # TODO: 나중에 fotmob id 날리고 그냥 이걸 id 로 사용할지 고려 필요
-    fotmob_id: int = Field(nullable=False, index=True, unique=True)
+    # FotMob ID를 id(PK)로 사용
+    id: int = Field(primary_key=True, index=True)
     
     match_date: datetime.datetime = Field(
         sa_type=sa.DateTime(timezone=True), 
@@ -35,8 +35,7 @@ class MatchLogsBase(SQLModel):
 class MatchLogs(MatchLogsBase, TimestampMixin, table=True):
     __tablename__ = "match_logs"
     
-    id: Optional[int] = Field(default=None, primary_key=True)
-
+    # FK (teams.id 참조)
     home_team_id: int = Field(foreign_key="teams.id")
     away_team_id: int = Field(foreign_key="teams.id")
 

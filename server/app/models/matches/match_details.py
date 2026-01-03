@@ -15,6 +15,7 @@ class MatchDetails(MatchDetailsBase, TimestampMixin, table=True):
     
     id: Optional[int] = Field(default=None, primary_key=True)
 
+    # match_logs FK (match_logs.id 참조)
     match_logs_id: int = Field(foreign_key="match_logs.id", nullable=False, index=True)
     
     match_logs: "MatchLogs" = Relationship(

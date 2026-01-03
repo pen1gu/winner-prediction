@@ -11,8 +11,8 @@ if TYPE_CHECKING:
 
 class TeamBase(SQLModel):
     """팀 기본 정보"""
-    # FotMob ID
-    fotmob_id: int = Field(nullable=False, index=True, unique=True)
+    # FotMob ID를 id(PK)로 사용
+    id: int = Field(primary_key=True, index=True)
     
     # 팀 이름
     name: str = Field(max_length=255, unique=True, nullable=False)
@@ -41,12 +41,10 @@ class TeamBase(SQLModel):
     # 경기장 도시
     stadium_city: Optional[str] = Field(default=None, max_length=128)
 
+
 class Team(TeamBase, TimestampMixin, table=True):
     """팀 정보 - SQLModel (DB + API)"""
     __tablename__ = "teams"
-    
-    # Primary Key
-    id: Optional[int] = Field(default=None, primary_key=True)
     
     # Relationships
     players: List["Player"] = Relationship(
@@ -62,7 +60,6 @@ class Team(TeamBase, TimestampMixin, table=True):
         back_populates="team",
         sa_relationship_kwargs={"lazy": "select"}
     )
-
     match_affect_features: List["PlayerMatchAffectFeatures"] = Relationship(
         back_populates="team",
         sa_relationship_kwargs={"lazy": "select"}
