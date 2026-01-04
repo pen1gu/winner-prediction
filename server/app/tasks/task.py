@@ -49,11 +49,11 @@ async def fetch_matches_by_team_id_task(team_id: int) -> dict:
 
     match_logs = await crawler.get_match_logs_info_by_team_id(team_id, response)
 
-    # TODO: 여기서 현재 있는 match 제거하고 남아있는 팀들을 자동으로 crawling할 수 있게 세팅을 하는게 좋지 않을까?
-
     match_team_ids = []
+    match_logs_ids = []
     for x in match_logs:
         match_team_ids.extend([x.home_team_id, x.away_team_id])
+        match_logs_ids.append(x.id)
 
     already_fetched_team_ids = await get_already_fetched_team_ids()
 
@@ -66,7 +66,15 @@ async def fetch_matches_by_team_id_task(team_id: int) -> dict:
 
     await save(match_logs)
 
+    for match_log_id in match_logs_ids:
+        match_details = await crawler.get_match_details_info_by_match_id(match_log_id)
+        logger.info("--------------------------------")
+        logger.info(match_details)
+        await save(match_details)
+    
+
     logger.info(f"Successfully fetched matches for team_id: {team_id}")
+
 
 
 tasks = [

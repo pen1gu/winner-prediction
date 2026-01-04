@@ -1,10 +1,11 @@
-from typing import List
+from typing import List, Dict, Optional, Any
 from datetime import datetime, timezone
 
 from server.app.models import (
     Player,
     Team,
     Manager,
+    MatchDetails,
 )
 from server.app.models.matches.match_logs import MatchLogs
 from server.utils.http.requests import FotMobHTTPClient
@@ -152,3 +153,106 @@ class FotMobCrawler:
             match_logs.append(match_log)
         
         return match_logs
+
+
+    def _calculate_lineup_power_rating(self, starters: List[dict]) -> float:
+        #TODO: 선수 details 데이터 추가되면 매일 업데이트해서 rating 변경할 수 있게 구현
+        pass
+
+    #TODO: 이건 db 조회해서 players id 추가하게 진행하자
+    def _parse_lineup_players(self, players_list: List[dict]) -> List[dict]:
+        """라인업의 선수 정보를 Player 모델 규격에 맞춰 변환"""
+        parsed_players = []
+        for p in players_list:
+            # Player 모델 필드 및 분석용 추가 필드 매핑
+            player_data = {
+                "id": p.get("id"),
+                "name": p.get("name", {}).get("fullName") if isinstance(p.get("name"), dict) else p.get("name"),
+                "age": p.get("age"),
+                "position": [str(p.get("positionId"))] if p.get("positionId") else [],
+                "shirt_number": p.get("shirtNumber"),
+                "role": p.get("role"),
+                # 분석용 추가 데이터
+                "market_value": p.get("marketValue"),
+                "rating": p.get("performance", {}).get("rating"),
+                "is_potm": p.get("performance", {}).get("playerOfTheMatch", False),
+                "usual_position_id": p.get("usualPlayingPositionId")
+            }
+            parsed_players.append(player_data)
+        return parsed_players
+
+    async def get_match_details_info_by_match_id(self, match_id: int) -> MatchDetails:
+        response = await self.client.get(
+            "/data/matchDetails",
+            params={"matchId": match_id},
+            raise_for_status=False
+        )
+        
+        if response.status_code != 200:
+            raise Exception(f"Failed to get match details: {response.status_code} - {response.text}")
+        
+        data = response.json()
+        general = data.get("general") or {}
+        header = data.get("header") or {}
+        status = header.get("status") or {}
+        content = data.get("content") or {}
+        match_facts = content.get("matchFacts") or {}
+        info_box = content.get("infoBox") or {}
+        
+        lineup = content.get("lineup") or {}
+        home_lineup_raw = lineup.get("homeTeam") or {}
+        away_lineup_raw = lineup.get("awayTeam") or {}
+        
+        # 1. 선수 데이터 파싱 (Player 모델 규격 참조)
+        home_starters = self._parse_lineup_players(home_lineup_raw.get("starters", []))
+        home_subs = self._parse_lineup_players(home_lineup_raw.get("subs", []))
+        away_starters = self._parse_lineup_players(away_lineup_raw.get("starters", []))
+        away_subs = self._parse_lineup_players(away_lineup_raw.get("subs", []))
+        
+        # 2. 라인업 파워 레이팅 계산
+        home_power_rating = self._calculate_lineup_power_rating(home_lineup_raw.get("starters", []))
+        away_power_rating = self._calculate_lineup_power_rating(away_lineup_raw.get("starters", []))
+        
+        # 3. 추가 정보 추출
+        stadium = info_box.get("Stadium")
+        referee = info_box.get("Referee", {}).get("text")
+        halfs = status.get("halfs")
+        
+        # 4. 통계 추출 (데이터가 없는 경우 대비)
+        stats_content = content.get("stats") or {}
+        teams_stats = stats_content.get("teams") or {}
+        home_team_stats = teams_stats.get("home") or {}
+        away_team_stats = teams_stats.get("away") or {}
+
+        return MatchDetails(
+            id=match_id,
+            match_name=general.get("matchName"),
+            league_name=general.get("leagueName"),
+            match_round=str(general.get("matchRound")) if general.get("matchRound") else None,
+            match_time_utc=general.get("matchTimeUTC"),
+            started=general.get("started"),
+            finished=general.get("finished"),
+            stadium=stadium,
+            referee=referee,
+            score_str=status.get("scoreStr"),
+            halfs_info=halfs,
+            penalty_shootout_reason=(status.get("reason") or {}).get("long"),
+            penalties=(status.get("reason") or {}).get("penalties"),
+            who_lost_on_penalties=status.get("whoLostOnPenalties"),
+            attendance=home_team_stats.get("attendance") or info_box.get("Attendance"),
+            events=(match_facts.get("events") or {}).get("events"),
+            home_expected_goals=home_team_stats.get("expectedGoals"),
+            away_expected_goals=away_team_stats.get("expectedGoals"),
+            home_stats=home_team_stats,
+            away_stats=away_team_stats,
+            player_of_the_match=match_facts.get("playerOfTheMatch"),
+            shotmap=content.get("shotmap"),
+            home_starting_players=home_starters,
+            home_substitute_players=home_subs,
+            home_lineup_power_rating=home_power_rating,
+            away_starting_players=away_starters,
+            away_substitute_players=away_subs,
+            away_lineup_power_rating=away_power_rating
+        )
+        
+
