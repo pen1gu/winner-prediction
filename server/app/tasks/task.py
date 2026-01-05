@@ -1,5 +1,5 @@
 from server.app.crawler.fotmob import FotMobCrawler
-from server.app.store.db_query import get_already_fetched_team_ids
+from server.app.store.db_query import get_already_fetched_player_ids, get_already_fetched_team_ids
 from server.utils.logger import get_logger
 from server.app.store.db_store import save
 logger = get_logger(__name__)
@@ -52,8 +52,15 @@ async def fetch_matches_by_team_id_task(team_id: int) -> dict:
     match_team_ids = []
     match_logs_ids = []
     for x in match_logs:
-        match_team_ids.extend([x.home_team_id, x.away_team_id])
-        match_logs_ids.append(x.id)
+        if hasattr(x, "home_team_id") and hasattr(x, "away_team_id"):
+            match_team_ids.extend([x.home_team_id, x.away_team_id])
+        if hasattr(x, "id") and not hasattr(x, "match_id"): # MatchLogs
+            match_logs_ids.append(x.id)
+        elif hasattr(x, "match_id") and not hasattr(x, "id"): # MatchInfos/MatchDetails
+            match_logs_ids.append(x.match_id)
+    
+    # 중복 제거
+    match_logs_ids = list(set(match_logs_ids))
 
     already_fetched_team_ids = await get_already_fetched_team_ids()
 
@@ -64,17 +71,18 @@ async def fetch_matches_by_team_id_task(team_id: int) -> dict:
         team = await crawler.get_team_info_by_team_id(team_id, not_fetched_team_response)
         await save(team)
 
+        new_player_infos = await crawler.get_players_info_by_team_id(team, not_fetched_team_response)
+        await save(new_player_infos)
+
     await save(match_logs)
 
     for match_log_id in match_logs_ids:
         match_details = await crawler.get_match_details_info_by_match_id(match_log_id)
-        logger.info("--------------------------------")
-        logger.info(match_details)
-        await save(match_details)
+        for detail in match_details:
+            await save(detail)
     
 
     logger.info(f"Successfully fetched matches for team_id: {team_id}")
-
 
 
 tasks = [
