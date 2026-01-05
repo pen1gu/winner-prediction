@@ -6,8 +6,10 @@ from server.utils.model.db_model import TimestampMixin
 if TYPE_CHECKING:
     from server.app.models.players.player import Player
     from .manager import Manager
-    from server.app.models.players.player_details import PlayerDetails
+    from server.app.models.players.player_info import PlayerInfos
     from server.app.models.players.player_match_affect_features import PlayerMatchAffectFeatures
+    from server.app.models.players.player_match_details import PlayerMatchDetails
+    from server.app.models.matches.match_details import MatchDetails
 
 class TeamBase(SQLModel):
     """팀 기본 정보"""
@@ -47,20 +49,28 @@ class Team(TeamBase, TimestampMixin, table=True):
     __tablename__ = "teams"
     
     # Relationships
-    players: List["Player"] = Relationship(
+    # 감독 정보 (1:1 관계)
+    manager: Optional["Manager"] = Relationship(
         back_populates="team",
-        sa_relationship_kwargs={"cascade": "all, delete-orphan", "lazy": "select"}
+        sa_relationship_kwargs={"lazy": "select", "uselist": False}
     )
-    managers: Optional["Manager"] = Relationship(
+
+    # 팀 소속 선수 정보 리스트
+    player_infos: List["PlayerInfos"] = Relationship(
         back_populates="team",
         sa_relationship_kwargs={"lazy": "select"}
     )
 
-    details: List["PlayerDetails"] = Relationship(
+    # 팀의 경기 참여 기록 (MatchDetails를 통해 연결)
+    match_details: List["MatchDetails"] = Relationship(
         back_populates="team",
         sa_relationship_kwargs={"lazy": "select"}
     )
+
     match_affect_features: List["PlayerMatchAffectFeatures"] = Relationship(
         back_populates="team",
+        sa_relationship_kwargs={"lazy": "select"}
+    )
+    player_match_details: List["PlayerMatchDetails"] = Relationship(
         sa_relationship_kwargs={"lazy": "select"}
     )
