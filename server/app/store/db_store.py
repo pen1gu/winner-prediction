@@ -19,9 +19,10 @@ async def upsert_model(
 
     data = obj.model_dump(exclude_none=True)
     
-    # 기본 충돌 컬럼을 id로 설정 (이제 fotmob_id가 id로 바뀌었으므로)
+    # 1. 모델에 __upsert_conflict_cols__ 정의가 있으면 사용
+    # 2. 없으면 PK 사용
     if conflict_cols is None:
-        conflict_cols = ["id"] if "id" in data else []
+        conflict_cols = getattr(model, "__upsert_conflict_cols__", [c.name for c in table.primary_key])
 
     if conflict_cols:
         stmt = pg_insert(table).values(**data)
