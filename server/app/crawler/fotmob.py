@@ -6,6 +6,9 @@ from server.app.models import (
     Team,
     Manager,
     MatchDetails,
+    MatchInfos,
+    PlayerMatchDetails,
+    PlayerInfos,
 )
 from server.app.models.matches.match_logs import MatchLogs
 from server.utils.http.requests import FotMobHTTPClient
@@ -29,20 +32,28 @@ class FotMobCrawler:
 
         return response.json()
 
-    async def get_players_info_by_team_id(self, team: Team, response: dict) -> List[Player]:
+    async def get_players_info_by_team_id(self, team: Team, response: dict) -> List[Any]:
         squad = response.get("squad", {}).get("squad", [None, {}])[1:]
 
-        players: list[Player] = []
+        results = []
         for players_info in squad:
             for player_info in players_info.get("members", []):
+                player_id = player_info.get("id")
+                if not player_id:
+                    continue
+                
                 position_str = player_info.get("positionIdsDesc", "")
                 position_list = [p.strip() for p in position_str.split(",")] if position_str else None
                 
-                players.append(
-                    Player(
-                        id=player_info.get("id"), # fotmob_id -> id
+                # Player (ID만)
+                player = Player(id=player_id)
+                
+                # PlayerInfos (기본 정보)
+                player_infos_obj = PlayerInfos(
+                    id=player_id,
                         name=player_info.get("name"),
                         age=player_info.get("age"),
+                        team_id=team.id,
                         position=position_list,
                         role=player_info.get("role"),
                         shirt_number=player_info.get("shirtNumber"),
@@ -53,9 +64,10 @@ class FotMobCrawler:
                         birth_country=player_info.get("cname"),
                         birth_state=player_info.get("cname"),
                     )
-                )
+                
+                results.extend([player, player_infos_obj])
 
-        return players
+        return results
 
     async def get_team_info_by_team_id(self, team_id: int, response: dict) -> Team:
         team_details = response.get("details", {})
@@ -87,11 +99,12 @@ class FotMobCrawler:
             id=manager_details.get("id"), # fotmob_id -> id
             name=manager_details.get("name"),
             age=manager_details.get("age"),
+            team_id=team.id,
             country=manager_details.get("cname"),
         )
         return manager
 
-    async def get_match_logs_info_by_team_id(self, team_id: int, response: dict) -> List[MatchLogs]:
+    async def get_match_logs_info_by_team_id(self, team_id: int, response: dict) -> List[Any]:
         fixtures = response.get("fixtures", {})
         all_fixtures = fixtures.get("allFixtures", {})
         match_logs_data = all_fixtures.get("fixtures", [])
@@ -100,7 +113,7 @@ class FotMobCrawler:
         if not match_logs_data:
             return []
         
-        match_logs = []
+        results = []
         current_date = datetime.now(timezone.utc)
         next_match_id = next_match_data.get("id") if next_match_data else None
         
@@ -138,50 +151,66 @@ class FotMobCrawler:
             
             if not home_team_id or not away_team_id: continue
             
-            match_log = MatchLogs(
-                id=match_id, # fotmob_id -> id
+            # MatchLogs (ID만 포함)
+            match_log = MatchLogs(id=match_id)
+            
+            # MatchInfos (공통 정보)
+            match_info = MatchInfos(
+                id=match_id,
                 match_date=match_date,
-                home_score=home_team.get("score", 0),
-                away_score=away_team.get("score", 0),
-                next_match=is_next_match,
-                finished=finished,
-                cancelled=cancelled,
                 home_team_id=home_team_id,
                 away_team_id=away_team_id,
+                finished=finished,
+                cancelled=cancelled,
+                next_match=is_next_match
             )
             
-            match_logs.append(match_log)
+            # MatchDetails (기초 점수 정보)
+            home_details = MatchDetails(
+                id=match_id,
+                team_id=home_team_id,
+                is_home=True,
+                score=home_team.get("score", 0)
+            )
+            away_details = MatchDetails(
+                id=match_id,
+                team_id=away_team_id,
+                is_home=False,
+                score=away_team.get("score", 0)
+            )
+            
+            results.extend([match_log, match_info, home_details, away_details])
         
-        return match_logs
+        return results
 
 
-    def _calculate_lineup_power_rating(self, starters: List[dict]) -> float:
-        #TODO: 선수 details 데이터 추가되면 매일 업데이트해서 rating 변경할 수 있게 구현
-        pass
+    def _calculate_lineup_power_rating(self, starters: List[dict]) -> Optional[float]:
+        """라인업 기반 전력 레이팅 계산 (사용자 직접 구현 예정)"""
+        return None
 
-    #TODO: 이건 db 조회해서 players id 추가하게 진행하자
-    def _parse_lineup_players(self, players_list: List[dict]) -> List[dict]:
-        """라인업의 선수 정보를 Player 모델 규격에 맞춰 변환"""
-        parsed_players = []
+    def _parse_lineup_players(self, players_list: List[dict], team_id: int) -> List[Dict[str, Any]]:
+        """라인업의 선수 정보를 Player 모델 및 ID/평점 정보로 변환"""
+        parsed_data = []
         for p in players_list:
-            # Player 모델 필드 및 분석용 추가 필드 매핑
-            player_data = {
-                "id": p.get("id"),
-                "name": p.get("name", {}).get("fullName") if isinstance(p.get("name"), dict) else p.get("name"),
-                "age": p.get("age"),
-                "position": [str(p.get("positionId"))] if p.get("positionId") else [],
-                "shirt_number": p.get("shirtNumber"),
-                "role": p.get("role"),
-                # 분석용 추가 데이터
-                "market_value": p.get("marketValue"),
-                "rating": p.get("performance", {}).get("rating"),
-                "is_potm": p.get("performance", {}).get("playerOfTheMatch", False),
-                "usual_position_id": p.get("usualPlayingPositionId")
-            }
-            parsed_players.append(player_data)
-        return parsed_players
+            player_id = p.get("id")
+            if not player_id:
+                continue
+                
+            # 1. Player 모델 객체 생성 (ID만)
+            player = Player(id=player_id)
+            
+            # 2. 경기별 메타 데이터 (ID와 평점)
+            performance = p.get("performance") or {}
+            rating = performance.get("rating")
+            
+            parsed_data.append({
+                "player": player,
+                "id": player_id,
+                "rating": rating
+            })
+        return parsed_data
 
-    async def get_match_details_info_by_match_id(self, match_id: int) -> MatchDetails:
+    async def get_match_details_info_by_match_id(self, match_id: int) -> List[Any]:
         response = await self.client.get(
             "/data/matchDetails",
             params={"matchId": match_id},
@@ -197,62 +226,391 @@ class FotMobCrawler:
         status = header.get("status") or {}
         content = data.get("content") or {}
         match_facts = content.get("matchFacts") or {}
-        info_box = content.get("infoBox") or {}
+        info_box = match_facts.get("infoBox") or {}
         
         lineup = content.get("lineup") or {}
         home_lineup_raw = lineup.get("homeTeam") or {}
         away_lineup_raw = lineup.get("awayTeam") or {}
         
-        # 1. 선수 데이터 파싱 (Player 모델 규격 참조)
-        home_starters = self._parse_lineup_players(home_lineup_raw.get("starters", []))
-        home_subs = self._parse_lineup_players(home_lineup_raw.get("subs", []))
-        away_starters = self._parse_lineup_players(away_lineup_raw.get("starters", []))
-        away_subs = self._parse_lineup_players(away_lineup_raw.get("subs", []))
+        home_team_id = general.get("homeTeam", {}).get("id")
+        away_team_id = general.get("awayTeam", {}).get("id")
+
+        # 1. 선수 데이터 파싱
+        home_starters_data = self._parse_lineup_players(home_lineup_raw.get("starters", []), home_team_id)
+        home_subs_data = self._parse_lineup_players(home_lineup_raw.get("subs", []), home_team_id)
+        away_starters_data = self._parse_lineup_players(away_lineup_raw.get("starters", []), away_team_id)
+        away_subs_data = self._parse_lineup_players(away_lineup_raw.get("subs", []), away_team_id)
         
+        # 모든 Player 객체 (기본 정보 업데이트용)
+        all_players = [d["player"] for d in (home_starters_data + home_subs_data + away_starters_data + away_subs_data)]
+        
+        # 명단 ID 리스트 및 평점 맵 구성
+        home_starter_ids = [d["id"] for d in home_starters_data]
+        home_sub_ids = [d["id"] for d in home_subs_data]
+        away_starter_ids = [d["id"] for d in away_starters_data]
+        away_sub_ids = [d["id"] for d in away_subs_data]
+        
+        player_ratings = {}
+        for d in (home_starters_data + home_subs_data + away_starters_data + away_subs_data):
+            if d["rating"]:
+                player_ratings[str(d["id"])] = d["rating"]
+
         # 2. 라인업 파워 레이팅 계산
         home_power_rating = self._calculate_lineup_power_rating(home_lineup_raw.get("starters", []))
         away_power_rating = self._calculate_lineup_power_rating(away_lineup_raw.get("starters", []))
         
-        # 3. 추가 정보 추출
-        stadium = info_box.get("Stadium")
-        referee = info_box.get("Referee", {}).get("text")
-        halfs = status.get("halfs")
-        
-        # 4. 통계 추출 (데이터가 없는 경우 대비)
+        # 3. 통계 추출
         stats_content = content.get("stats") or {}
         teams_stats = stats_content.get("teams") or {}
-        home_team_stats = teams_stats.get("home") or {}
-        away_team_stats = teams_stats.get("away") or {}
+        home_team_stats_raw = teams_stats.get("home") or {}
+        away_team_stats_raw = teams_stats.get("away") or {}
 
-        return MatchDetails(
+        def extract_stats(stats_list: List[Dict]) -> Dict[str, Any]:
+            """FotMob stats 리스트에서 필요한 지표 추출"""
+            extracted = {}
+            for group in stats_list:
+                for stat in group.get("stats", []):
+                    title = stat.get("title")
+                    val = stat.get("stat", {}).get("value")
+                    if val is None:
+                        continue
+                        
+                    try:
+                        if title == "Ball possession": 
+                            extracted["possession"] = float(val.replace("%", "")) if isinstance(val, str) else float(val)
+                        elif title == "Total shots": 
+                            extracted["shots_total"] = int(val)
+                        elif title == "Shots on target": 
+                            extracted["shots_on_target"] = int(val)
+                        elif title == "Big chances": 
+                            extracted["big_chances"] = int(val)
+                        elif title == "Big chances missed": 
+                            extracted["big_chances_missed"] = int(val)
+                        elif title == "Accurate passes": 
+                            if isinstance(val, str) and "/" in val:
+                                extracted["accurate_passes"] = int(val.split("/")[0])
+                            else:
+                                extracted["accurate_passes"] = int(val)
+                        elif title == "Total passes": 
+                            if isinstance(val, str) and "/" in val:
+                                # "345/412" 형태인 경우 분모 추출
+                                extracted["total_passes"] = int(val.split("/")[1].split()[0])
+                            else:
+                                extracted["total_passes"] = int(val)
+                        elif title == "Corners": 
+                            extracted["corners"] = int(val)
+                        elif title == "Offsides": 
+                            extracted["offsides"] = int(val)
+                        elif title == "Fouls committed": 
+                            extracted["fouls"] = int(val)
+                        elif title == "Yellow cards": 
+                            extracted["yellow_cards"] = int(val)
+                        elif title == "Red cards": 
+                            extracted["red_cards"] = int(val)
+                    except (ValueError, AttributeError, IndexError):
+                        continue
+            return extracted
+
+        home_stats = extract_stats(home_team_stats_raw.get("stats", []))
+        away_stats = extract_stats(away_team_stats_raw.get("stats", []))
+
+        # 4. MatchInfos 생성
+        match_date_str = general.get("matchTimeUTCDate")
+        match_date = datetime.fromisoformat(match_date_str.replace('Z', '+00:00')) if match_date_str else datetime.now(timezone.utc)
+        
+        is_finished = general.get("finished", False)
+
+        match_info = MatchInfos(
             id=match_id,
+            match_date=match_date,
             match_name=general.get("matchName"),
             league_name=general.get("leagueName"),
             match_round=str(general.get("matchRound")) if general.get("matchRound") else None,
             match_time_utc=general.get("matchTimeUTC"),
-            started=general.get("started"),
-            finished=general.get("finished"),
-            stadium=stadium,
-            referee=referee,
-            score_str=status.get("scoreStr"),
-            halfs_info=halfs,
-            penalty_shootout_reason=(status.get("reason") or {}).get("long"),
-            penalties=(status.get("reason") or {}).get("penalties"),
-            who_lost_on_penalties=status.get("whoLostOnPenalties"),
-            attendance=home_team_stats.get("attendance") or info_box.get("Attendance"),
+            stadium=(info_box.get("Stadium") or {}).get("name"),
+            referee=info_box.get("Referee", {}).get("text"),
+            attendance=home_team_stats_raw.get("attendance") or info_box.get("Attendance"),
+            weather=info_box.get("Weather"),
+            next_match=not general.get("started") and not general.get("finished"),
+            finished=is_finished,
+            cancelled=status.get("cancelled", False),
+            halfs_info=status.get("halfs"),
             events=(match_facts.get("events") or {}).get("events"),
-            home_expected_goals=home_team_stats.get("expectedGoals"),
-            away_expected_goals=away_team_stats.get("expectedGoals"),
-            home_stats=home_team_stats,
-            away_stats=away_team_stats,
-            player_of_the_match=match_facts.get("playerOfTheMatch"),
             shotmap=content.get("shotmap"),
-            home_starting_players=home_starters,
-            home_substitute_players=home_subs,
-            home_lineup_power_rating=home_power_rating,
-            away_starting_players=away_starters,
-            away_substitute_players=away_subs,
-            away_lineup_power_rating=away_power_rating
+            home_team_id=home_team_id,
+            away_team_id=away_team_id
         )
+
+        # 5. MatchDetails 생성 (홈/어웨이)
+        header_teams = header.get("teams", [{}, {}])
+        home_header_score = header_teams[0].get("score")
+        away_header_score = header_teams[1].get("score")
         
+        reason = status.get("reason") or {}
+        penalties = reason.get("penalties") # [home, away]
+        
+        # MOM 정보 추출
+        potm_info = match_facts.get("playerOfTheMatch") or {}
+        potm_player_id = potm_info.get("id")
+        
+        home_details = MatchDetails(
+            id=match_id,
+            team_id=home_team_id,
+            is_home=True,
+            score=home_header_score if home_header_score is not None else 0,
+            penalty_score=penalties[0] if penalties else None,
+            is_penalty_loser=status.get("whoLostOnPenalties") == header_teams[0].get("name"),
+            score_str=status.get("scoreStr"),
+            penalty_shootout_reason=reason.get("long"),
+            expected_goals_value=home_team_stats_raw.get("expectedGoals"),
+            **home_stats,
+            starting_players=home_starter_ids,
+            substitute_players=home_sub_ids,
+            player_ratings=player_ratings,
+            lineup_power_rating=home_power_rating,
+            potm_player_id=potm_player_id if potm_info.get("teamId") == home_team_id else None
+        )
+
+        away_details = MatchDetails(
+            id=match_id,
+            team_id=away_team_id,
+            is_home=False,
+            score=away_header_score if away_header_score is not None else 0,
+            penalty_score=penalties[1] if penalties else None,
+            is_penalty_loser=status.get("whoLostOnPenalties") == header_teams[1].get("name"),
+            score_str=status.get("scoreStr"),
+            penalty_shootout_reason=reason.get("long"),
+            expected_goals_value=away_team_stats_raw.get("expectedGoals"),
+            **away_stats,
+            starting_players=away_starter_ids,
+            substitute_players=away_sub_ids,
+            player_ratings=player_ratings,
+            lineup_power_rating=away_power_rating,
+            potm_player_id=potm_player_id if potm_info.get("teamId") == away_team_id else None
+        )
+
+        # 6. PlayerMatchDetails 생성 (선수별 경기 상세 스탯)
+        player_match_details_list = []
+        
+        # 경기가 종료된 경우에만 선수별 상세 스탯 추출
+        if is_finished:
+            # shotmap 데이터 가져오기
+            shotmap_data = content.get("shotmap") or {}
+            
+            # 선수별 상세 통계 추출 (FotMob API의 playerStats 섹션에서)
+            player_stats_section = content.get("playerStats") or {}
+            
+            # 홈팀 선수 스탯
+            home_player_stats = player_stats_section.get("home", {}).get("players", [])
+            for player_stat in home_player_stats:
+                player_match_detail = self._parse_player_match_details(
+                    match_id=match_id,
+                    player_stat=player_stat,
+                    team_id=home_team_id,
+                    starters_ids=home_starter_ids,
+                    subs_ids=home_sub_ids,
+                    potm_player_id=potm_player_id,
+                    shotmap_data=shotmap_data
+                )
+                if player_match_detail:
+                    player_match_details_list.append(player_match_detail)
+            
+            # 어웨이팀 선수 스탯
+            away_player_stats = player_stats_section.get("away", {}).get("players", [])
+            for player_stat in away_player_stats:
+                player_match_detail = self._parse_player_match_details(
+                    match_id=match_id,
+                    player_stat=player_stat,
+                    team_id=away_team_id,
+                    starters_ids=away_starter_ids,
+                    subs_ids=away_sub_ids,
+                    potm_player_id=potm_player_id,
+                    shotmap_data=shotmap_data
+                )
+                if player_match_detail:
+                    player_match_details_list.append(player_match_detail)
+
+        # 모든 모델 객체를 하나의 리스트로 합쳐서 반환
+        result = [match_info, home_details, away_details]
+        result.extend(all_players)
+        result.extend(player_match_details_list)
+        return result
+
+    def _parse_player_match_details(
+        self,
+        match_id: int,
+        player_stat: Dict,
+        team_id: int,
+        starters_ids: List[int],
+        subs_ids: List[int],
+        potm_player_id: Optional[int],
+        shotmap_data: Optional[Dict] = None
+    ) -> Optional[PlayerMatchDetails]:
+        """선수별 경기 상세 스탯을 PlayerMatchDetails 객체로 변환"""
+        player_id = player_stat.get("id")
+        if not player_id:
+            return None
+        
+        # 선발/교체 여부 판단
+        is_starter = player_id in starters_ids
+        is_sub = player_id in subs_ids
+        
+        # 기본 정보
+        performance = player_stat.get("performance", {})
+        stats = player_stat.get("stats", {})
+        
+        # 포지션 정보
+        position = player_stat.get("position") or player_stat.get("positionId")
+        if isinstance(position, int):
+            # positionId를 문자열로 변환 (필요시 매핑 로직 추가 가능)
+            position = str(position)
+        
+        # 출전 시간
+        minutes_played = stats.get("minutesPlayed") or performance.get("minutesPlayed")
+        
+        # 평점
+        rating = performance.get("rating")
+        
+        # MOM 여부
+        is_man_of_the_match = (potm_player_id is not None and player_id == potm_player_id)
+        
+        # 공격 스탯
+        goals = stats.get("goals", 0) or performance.get("goals", 0)
+        assists = stats.get("assists", 0) or performance.get("assists", 0)
+        shots_total = stats.get("shotsTotal") or stats.get("totalShots")
+        shots_on_target = stats.get("shotsOnTarget") or stats.get("shotsOnGoal")
+        expected_goals = stats.get("expectedGoals") or stats.get("xG")
+        expected_goals_on_target = stats.get("expectedGoalsOnTarget") or stats.get("xGOT")
+        expected_assists = stats.get("expectedAssists") or stats.get("xA")
+        
+        # xG + xA 계산
+        expected_goals_plus_assists = None
+        if expected_goals is not None or expected_assists is not None:
+            xg_val = expected_goals if expected_goals is not None else 0
+            xa_val = expected_assists if expected_assists is not None else 0
+            expected_goals_plus_assists = xg_val + xa_val
+        
+        # 패스 스탯
+        passes_completed = stats.get("passesCompleted") or stats.get("accuratePasses")
+        passes_attempted = stats.get("passesAttempted") or stats.get("totalPasses")
+        
+        # 패스 성공률 계산
+        pass_accuracy = None
+        if passes_completed is not None and passes_attempted is not None and passes_attempted > 0:
+            pass_accuracy = (passes_completed / passes_attempted) * 100
+        
+        final_third_passes = stats.get("finalThirdPasses") or stats.get("keyPasses")
+        long_passes_completed = stats.get("longPassesCompleted") or stats.get("longBallsWon")
+        crosses_completed = stats.get("crossesCompleted") or stats.get("accurateCrosses")
+        
+        # 수비 스탯
+        tackles = stats.get("tackles") or stats.get("tacklesWon")
+        interceptions = stats.get("interceptions")
+        clearances = stats.get("clearances")
+        recoveries = stats.get("recoveries") or stats.get("ballRecoveries")
+        blocks = stats.get("blocks") or stats.get("blockedShots")
+        dribbles_stopped = stats.get("dribblesStopped") or stats.get("dribbledPast")
+        
+        # 듀얼 스탯
+        ground_duels_won = stats.get("groundDuelsWon") or stats.get("duelsWon")
+        ground_duels_total = stats.get("groundDuelsTotal") or stats.get("totalDuels")
+        aerial_duels_won = stats.get("aerialDuelsWon")
+        aerial_duels_total = stats.get("aerialDuelsTotal")
+        
+        # 듀얼 승률 계산
+        ground_duels_win_rate = None
+        if ground_duels_won is not None and ground_duels_total is not None and ground_duels_total > 0:
+            ground_duels_win_rate = (ground_duels_won / ground_duels_total) * 100
+        
+        aerial_duels_win_rate = None
+        if aerial_duels_won is not None and aerial_duels_total is not None and aerial_duels_total > 0:
+            aerial_duels_win_rate = (aerial_duels_won / aerial_duels_total) * 100
+        
+        # 카드 및 파울
+        yellow_cards = stats.get("yellowCards", 0) or performance.get("yellowCards", 0)
+        red_cards = stats.get("redCards", 0) or performance.get("redCards", 0)
+        fouls = stats.get("fouls") or stats.get("foulsCommitted")
+        
+        # 슈팅 이벤트 (shotmap에서 추출)
+        shot_events = self._extract_player_shot_events(player_id, shotmap_data)
+        
+        return PlayerMatchDetails(
+            match_id=match_id,
+            id=player_id,
+            team_id=team_id,
+            position=position,
+            minutes_played=minutes_played,
+            is_starter=is_starter,
+            rating=rating,
+            is_man_of_the_match=is_man_of_the_match,
+            goals=goals,
+            assists=assists,
+            shots_total=shots_total,
+            shots_on_target=shots_on_target,
+            expected_goals=expected_goals,
+            expected_goals_on_target=expected_goals_on_target,
+            expected_assists=expected_assists,
+            expected_goals_plus_assists=expected_goals_plus_assists,
+            passes_completed=passes_completed,
+            passes_attempted=passes_attempted,
+            pass_accuracy=pass_accuracy,
+            final_third_passes=final_third_passes,
+            long_passes_completed=long_passes_completed,
+            crosses_completed=crosses_completed,
+            tackles=tackles,
+            interceptions=interceptions,
+            clearances=clearances,
+            recoveries=recoveries,
+            blocks=blocks,
+            dribbles_stopped=dribbles_stopped,
+            ground_duels_won=ground_duels_won,
+            ground_duels_total=ground_duels_total,
+            ground_duels_win_rate=ground_duels_win_rate,
+            aerial_duels_won=aerial_duels_won,
+            aerial_duels_total=aerial_duels_total,
+            aerial_duels_win_rate=aerial_duels_win_rate,
+            shot_events=shot_events,
+            yellow_cards=yellow_cards,
+            red_cards=red_cards,
+            fouls=fouls,
+        )
+
+    def _extract_player_shot_events(self, player_id: int, shotmap_data: Optional[Dict]) -> Optional[List[Dict]]:
+        """shotmap 데이터에서 해당 선수의 슈팅 이벤트 추출"""
+        if not shotmap_data:
+            return None
+        
+        shot_events = []
+        
+        shots = []
+        if isinstance(shotmap_data, dict):
+            # home/away 구조인 경우
+            if "home" in shotmap_data and "away" in shotmap_data:
+                shots = (shotmap_data.get("home", {}).get("shots", []) + 
+                        shotmap_data.get("away", {}).get("shots", []))
+            # 직접 shots 배열인 경우
+            elif "shots" in shotmap_data:
+                shots = shotmap_data.get("shots", [])
+            # events 배열인 경우
+            elif "events" in shotmap_data:
+                shots = [e for e in shotmap_data.get("events", []) if e.get("eventType") in ["Goal", "Shot", "ShotOnPost"]]
+        
+        # 해당 선수의 슈팅 이벤트 필터링
+        for shot in shots:
+            if shot.get("playerId") == player_id:
+                shot_event = {
+                    "minute": shot.get("min") or shot.get("minute"),
+                    "x": shot.get("x"),
+                    "y": shot.get("y"),
+                    "eventType": shot.get("eventType") or shot.get("type"),
+                    "xG": shot.get("expectedGoals") or shot.get("xG"),
+                    "shotType": shot.get("shotType"),
+                    "situation": shot.get("situation"),
+                    "insideBox": shot.get("isFromInsideBox") or shot.get("insideBox", False)
+                }
+                # None 값 제거
+                shot_event = {k: v for k, v in shot_event.items() if v is not None}
+                shot_events.append(shot_event)
+        
+        return shot_events if shot_events else None
 
