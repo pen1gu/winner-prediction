@@ -1,87 +1,114 @@
+from sqlalchemy.orm import foreign
 from typing import Optional, TYPE_CHECKING, List, Dict
 from sqlmodel import Relationship, SQLModel, Field, JSON, Column
+from sqlalchemy import ForeignKey, Integer
 
 from server.utils.model.db_model import TimestampMixin
 
 if TYPE_CHECKING:
     from server.app.models.matches.match_logs import MatchLogs
+    from server.app.models.teams.team import Team
+    from server.app.models.players.player import Player
 
 class MatchDetailsBase(SQLModel):
-    """MatchDetails 기본 정보 (공통 필드)"""
+    """MatchDetails 팀별 상세 정보"""
 
-    # 경기 기본 정보
-    match_name: Optional[str] = Field(default=None)
+    # 홈팀 여부 (True: 홈, False: 어웨이)
+    is_home: bool = Field(default=True)
 
-    league_name: Optional[str] = Field(default=None)
+    # --- 경기 결과 (팀별) ---
+    # 해당 팀의 득점
+    score: int = Field(default=0)
 
-    match_round: Optional[str] = Field(default=None)
+    # 승부차기 득점 (있을 경우)
+    penalty_score: Optional[int] = Field(default=None)
 
-    match_time_utc: Optional[str] = Field(default=None)
+    # 승부차기 패배 여부
+    is_penalty_loser: bool = Field(default=False)
 
-    started: Optional[bool] = Field(default=None)
-
-    finished: Optional[bool] = Field(default=None)
-
-    # 경기장 및 심판 정보
-    stadium: Optional[str] = Field(default=None)
-
-    referee: Optional[str] = Field(default=None)
-
-    # 상세 스코어 및 진행 정보
+    # 최종 스코어 문자열 (예: "2 - 3")
     score_str: Optional[str] = Field(default=None)
 
-    halfs_info: Optional[Dict] = Field(default=None, sa_column=Column(JSON))
-
-    # 승부차기 결과
+    # 승부차기 결과 요약 (예: "Pen 6 - 5")
     penalty_shootout_reason: Optional[str] = Field(default=None)
 
-    penalties: Optional[List[int]] = Field(default=None, sa_column=Column(JSON))
+    # 기대 득점 (xG) 수치
+    expected_goals_value: Optional[float] = Field(default=None)
 
-    who_lost_on_penalties: Optional[str] = Field(default=None)
+    # 볼 점유율 (%)
+    possession: Optional[float] = Field(default=None)
 
-    # 관중 수
-    attendance: Optional[int] = Field(default=None)
+    # 전체 슈팅 수
+    shots_total: Optional[int] = Field(default=None)
 
-    # 득점 및 주요 이벤트
-    events: Optional[List[Dict]] = Field(default=None, sa_column=Column(JSON))
+    # 유효 슈팅 수
+    shots_on_target: Optional[int] = Field(default=None)
 
-    # 팀 xG
-    home_expected_goals: Optional[float] = Field(default=None)
+    # 결정적 기회 (Big Chances)
+    big_chances: Optional[int] = Field(default=None)
 
-    away_expected_goals: Optional[float] = Field(default=None)
+    # 결정적 기회 미스
+    big_chances_missed: Optional[int] = Field(default=None)
 
-    # 팀 상세 스탯 (슈팅, 점유율 등)
-    home_stats: Optional[Dict] = Field(default=None, sa_column=Column(JSON))
+    # 코너킥
+    corners: Optional[int] = Field(default=None)
 
-    away_stats: Optional[Dict] = Field(default=None, sa_column=Column(JSON))
+    # 파울
+    fouls: Optional[int] = Field(default=None)
 
-    # MOM (Man of the Match)
-    player_of_the_match: Optional[Dict] = Field(default=None, sa_column=Column(JSON))
+    # 경고 (Yellow Cards)
+    yellow_cards: Optional[int] = Field(default=None)
 
-    # 슈팅맵 및 전술 흐름
-    shotmap: Optional[Dict] = Field(default=None, sa_column=Column(JSON))
+    # 퇴장 (Red Cards)
+    red_cards: Optional[int] = Field(default=None)
 
-    # 홈 팀 선수 목록
-    home_starting_players: Optional[List[Dict]] = Field(default=None, sa_column=Column(JSON))
+    # 패스 성공 수
+    accurate_passes: Optional[int] = Field(default=None)
 
-    home_substitute_players: Optional[List[Dict]] = Field(default=None, sa_column=Column(JSON))
+    # 전체 패스 수
+    total_passes: Optional[int] = Field(default=None)
 
-    home_lineup_power_rating: Optional[float] = Field(default=None)
+    # 오프사이드
+    offsides: Optional[int] = Field(default=None)
 
-    # 어웨이 팀 선수 목록
-    away_starting_players: Optional[List[Dict]] = Field(default=None, sa_column=Column(JSON))
+    # --- 선수 명단 및 레이팅 (ID 기반) ---
+    # 선발 선수 ID 리스트
+    starting_players: List[int] = Field(default_factory=list, sa_column=Column(JSON))
 
-    away_substitute_players: Optional[List[Dict]] = Field(default=None, sa_column=Column(JSON))
+    # 교체 선수 ID 리스트
+    substitute_players: List[int] = Field(default_factory=list, sa_column=Column(JSON))
 
-    away_lineup_power_rating: Optional[float] = Field(default=None)
+    # 선수별 평점 매핑 (예: {"12345": 8.5})
+    player_ratings: Dict[str, float] = Field(default_factory=dict, sa_column=Column(JSON))
+
+    # 라인업 기반 전력 레이팅 (선수들의 개별 레이팅 가중 평균)
+    lineup_power_rating: Optional[float] = Field(default=None)
 
 class MatchDetails(MatchDetailsBase, TimestampMixin, table=True):
     __tablename__ = "match_details"
     
-    # match_logs.id를 PK이자 FK로 사용 (1:1 매칭)
-    id: int = Field(primary_key=True, foreign_key="match_logs.id")
+    # 복합 PK 및 FK 설정 - sa_column 방식으로 통일
+    id: int = Field(sa_column=Column(Integer, ForeignKey("match_logs.id", ondelete="CASCADE"), primary_key=True))
+    
+    team_id: int = Field(sa_column=Column(Integer, ForeignKey("teams.id", ondelete="CASCADE"), primary_key=True))
 
+    # MOM(Man of the Match) 선수 ID - sa_column 방식으로 통일
+    potm_player_id: Optional[int] = Field(default=None, sa_column=Column(Integer, ForeignKey("players.id", ondelete="SET NULL"), nullable=True))
+
+    # Relationships
     match_logs: "MatchLogs" = Relationship(
         back_populates="match_details",
         sa_relationship_kwargs={"lazy": "select"}
+    )
+    
+    team: "Team" = Relationship(
+        back_populates="match_details",
+        sa_relationship_kwargs={"lazy": "select"}
+    )
+
+    potm_player: Optional["Player"] = Relationship(
+        sa_relationship_kwargs={
+            "primaryjoin": "MatchDetails.potm_player_id==foreign(Player.id)",
+            "lazy": "select"
+        }
     )

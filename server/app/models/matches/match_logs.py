@@ -1,52 +1,27 @@
-import datetime
-from typing import Optional, TYPE_CHECKING
+from typing import List, TYPE_CHECKING, Optional
 from sqlmodel import SQLModel, Field, Relationship
-import sqlalchemy as sa
 
 from server.utils.model.db_model import TimestampMixin
 
 if TYPE_CHECKING:
-    from server.app.models.teams.team import Team
     from .match_details import MatchDetails
+    from .match_infos import MatchInfos
 
 class MatchLogsBase(SQLModel):
-    """MatchLogs 기본 정보 (공통 필드)"""
-    # FotMob ID를 id(PK)로 사용
+    """MatchLogs 경기 식별자 (마스터 테이블)"""
     id: int = Field(primary_key=True, index=True)
-    
-    match_date: datetime.datetime = Field(
-        sa_type=sa.DateTime(timezone=True), 
-        nullable=False
-    )
-    
-    home_score: int = Field(nullable=False)
 
-    away_score: int = Field(nullable=False)
-
-    # 다음 경기인지 아닌지
-    next_match: bool = Field(nullable=False)
-
-    # False 진행 중, True 종료
-    finished: bool = Field(nullable=False)
-
-    # False 취소, True 진행
-    cancelled: bool = Field(nullable=False)
-    
 class MatchLogs(MatchLogsBase, TimestampMixin, table=True):
     __tablename__ = "match_logs"
-    
-    # FK (teams.id 참조)
-    home_team_id: int = Field(foreign_key="teams.id")
-    away_team_id: int = Field(foreign_key="teams.id")
 
-    home_team: "Team" = Relationship(
-        sa_relationship_kwargs={"primaryjoin": "MatchLogs.home_team_id==Team.id"}
-    )
-    away_team: "Team" = Relationship(
-        sa_relationship_kwargs={"primaryjoin": "MatchLogs.away_team_id==Team.id"}
-    )
-
-    match_details: Optional["MatchDetails"] = Relationship(
+    # 경기 기본 정보 (1:1)
+    match_infos: Optional["MatchInfos"] = Relationship(
         back_populates="match_logs",
-        sa_relationship_kwargs={"uselist": False, "lazy": "select"},
+        sa_relationship_kwargs={"uselist": False, "cascade": "all, delete-orphan"}
+    )
+    
+    # 팀별 경기 상세 통계 및 결과 (1:N - 홈/어웨이 2개 레코드)
+    match_details: List["MatchDetails"] = Relationship(
+        back_populates="match_logs",
+        sa_relationship_kwargs={"lazy": "select", "cascade": "all, delete-orphan"}
     )
