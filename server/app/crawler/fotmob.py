@@ -399,34 +399,22 @@ class FotMobCrawler:
             
             # 선수별 상세 통계 추출 (FotMob API의 playerStats 섹션에서)
             player_stats_section = content.get("playerStats") or {}
-            
-            # 홈팀 선수 스탯
-            home_player_stats = player_stats_section.get("home", {}).get("players", [])
-            for player_stat in home_player_stats:
+
+            # 모든 선발/교체 ID 통합 (홈/어웨이 구분 없이 처리하기 위함)
+            all_starters = set(home_starter_ids + away_starter_ids)
+            all_subs = set(home_sub_ids + away_sub_ids)
+
+            for player_stat in player_stats_section.values():
                 player_match_detail = self._parse_player_match_details(
                     match_id=match_id,
                     player_stat=player_stat,
-                    team_id=home_team_id,
-                    starters_ids=home_starter_ids,
-                    subs_ids=home_sub_ids,
+                    team_id=player_stat.get("teamId"),
+                    starters_ids=all_starters,
+                    subs_ids=all_subs,
                     potm_player_id=potm_player_id,
                     shotmap_data=shotmap_data
                 )
-                if player_match_detail:
-                    player_match_details_list.append(player_match_detail)
-            
-            # 어웨이팀 선수 스탯
-            away_player_stats = player_stats_section.get("away", {}).get("players", [])
-            for player_stat in away_player_stats:
-                player_match_detail = self._parse_player_match_details(
-                    match_id=match_id,
-                    player_stat=player_stat,
-                    team_id=away_team_id,
-                    starters_ids=away_starter_ids,
-                    subs_ids=away_sub_ids,
-                    potm_player_id=potm_player_id,
-                    shotmap_data=shotmap_data
-                )
+
                 if player_match_detail:
                     player_match_details_list.append(player_match_detail)
 
@@ -448,40 +436,51 @@ class FotMobCrawler:
     ) -> Optional[PlayerMatchDetails]:
         """선수별 경기 상세 스탯을 PlayerMatchDetails 객체로 변환"""
         player_id = player_stat.get("id")
-        if not player_id:
+        if not player_id or not team_id:
             return None
         
         # 선발/교체 여부 판단
         is_starter = player_id in starters_ids
-        is_sub = player_id in subs_ids
         
-        # 기본 정보
-        performance = player_stat.get("performance", {})
-        stats = player_stat.get("stats", {})
-        
-        # 포지션 정보
-        position = player_stat.get("position") or player_stat.get("positionId")
-        if isinstance(position, int):
-            # positionId를 문자열로 변환 (필요시 매핑 로직 추가 가능)
+        # stats 리스트에서 데이터 추출을 위한 맵 구성
+        raw_stats = {}
+        for group in player_stat.get("stats", []):
+            group_stats = group.get("stats", {})
+            for stat_name, stat_info in group_stats.items():
+                key = stat_info.get("key")
+                if key:
+                    raw_stats[key] = stat_info.get("stat")
+
+        # 헬퍼 함수: 필드 값 추출
+        def get_val(key, field="value"):
+            stat = raw_stats.get(key)
+            if stat:
+                return stat.get(field)
+            return None
+
+        # 포지션 정보 (usualPosition 혹은 positionId)
+        position = player_stat.get("positionId")
+        if position is None:
+            position = player_stat.get("usualPosition")
+            
+        if position is not None:
             position = str(position)
         
-        # 출전 시간
-        minutes_played = stats.get("minutesPlayed") or performance.get("minutesPlayed")
-        
-        # 평점
-        rating = performance.get("rating")
-        
-        # MOM 여부
+        # 기본 정보 및 성과
+        performance = player_stat.get("performance", {})
+        minutes_played = get_val("minutes_played")
+        rating = get_val("rating_title")
         is_man_of_the_match = (potm_player_id is not None and player_id == potm_player_id)
         
         # 공격 스탯
-        goals = stats.get("goals", 0) or performance.get("goals", 0)
-        assists = stats.get("assists", 0) or performance.get("assists", 0)
-        shots_total = stats.get("shotsTotal") or stats.get("totalShots")
-        shots_on_target = stats.get("shotsOnTarget") or stats.get("shotsOnGoal")
-        expected_goals = stats.get("expectedGoals") or stats.get("xG")
-        expected_goals_on_target = stats.get("expectedGoalsOnTarget") or stats.get("xGOT")
-        expected_assists = stats.get("expectedAssists") or stats.get("xA")
+        goals = get_val("goals") or 0
+        assists = get_val("assists") or 0
+        shots_total = get_val("total_shots")
+        
+        # xG, xA (있을 경우)
+        expected_goals = get_val("expected_goals")
+        expected_assists = get_val("expected_assists")
+        expected_goals_on_target = get_val("expected_goals_on_target")
         
         # xG + xA 계산
         expected_goals_plus_assists = None
@@ -491,31 +490,31 @@ class FotMobCrawler:
             expected_goals_plus_assists = xg_val + xa_val
         
         # 패스 스탯
-        passes_completed = stats.get("passesCompleted") or stats.get("accuratePasses")
-        passes_attempted = stats.get("passesAttempted") or stats.get("totalPasses")
+        passes_completed = get_val("accurate_passes")
+        passes_attempted = get_val("accurate_passes", "total")
         
         # 패스 성공률 계산
         pass_accuracy = None
         if passes_completed is not None and passes_attempted is not None and passes_attempted > 0:
             pass_accuracy = (passes_completed / passes_attempted) * 100
         
-        final_third_passes = stats.get("finalThirdPasses") or stats.get("keyPasses")
-        long_passes_completed = stats.get("longPassesCompleted") or stats.get("longBallsWon")
-        crosses_completed = stats.get("crossesCompleted") or stats.get("accurateCrosses")
+        final_third_passes = get_val("passes_into_final_third") or get_val("key_passes")
+        long_passes_completed = get_val("long_balls_won") or get_val("long_passes_completed")
+        crosses_completed = get_val("accurate_crosses")
         
         # 수비 스탯
-        tackles = stats.get("tackles") or stats.get("tacklesWon")
-        interceptions = stats.get("interceptions")
-        clearances = stats.get("clearances")
-        recoveries = stats.get("recoveries") or stats.get("ballRecoveries")
-        blocks = stats.get("blocks") or stats.get("blockedShots")
-        dribbles_stopped = stats.get("dribblesStopped") or stats.get("dribbledPast")
+        tackles = get_val("matchstats.headers.tackles") or get_val("tackles_won")
+        interceptions = get_val("interceptions")
+        clearances = get_val("clearances")
+        recoveries = get_val("recoveries")
+        blocks = get_val("shot_blocks")
+        dribbles_stopped = get_val("dribbles_stopped") or get_val("dribbled_past")
         
         # 듀얼 스탯
-        ground_duels_won = stats.get("groundDuelsWon") or stats.get("duelsWon")
-        ground_duels_total = stats.get("groundDuelsTotal") or stats.get("totalDuels")
-        aerial_duels_won = stats.get("aerialDuelsWon")
-        aerial_duels_total = stats.get("aerialDuelsTotal")
+        ground_duels_won = get_val("ground_duels_won") or get_val("duel_won")
+        ground_duels_total = get_val("ground_duels_won", "total")
+        aerial_duels_won = get_val("aerials_won")
+        aerial_duels_total = get_val("aerials_won", "total")
         
         # 듀얼 승률 계산
         ground_duels_win_rate = None
@@ -527,9 +526,9 @@ class FotMobCrawler:
             aerial_duels_win_rate = (aerial_duels_won / aerial_duels_total) * 100
         
         # 카드 및 파울
-        yellow_cards = stats.get("yellowCards", 0) or performance.get("yellowCards", 0)
-        red_cards = stats.get("redCards", 0) or performance.get("redCards", 0)
-        fouls = stats.get("fouls") or stats.get("foulsCommitted")
+        yellow_cards = 1 if performance.get("yellowCard") else 0
+        red_cards = 1 if performance.get("redCard") else 0
+        fouls = get_val("fouls")
         
         # 슈팅 이벤트 (shotmap에서 추출)
         shot_events = self._extract_player_shot_events(player_id, shotmap_data)
@@ -546,7 +545,7 @@ class FotMobCrawler:
             goals=goals,
             assists=assists,
             shots_total=shots_total,
-            shots_on_target=shots_on_target,
+            shots_on_target=get_val("shots_on_target"),
             expected_goals=expected_goals,
             expected_goals_on_target=expected_goals_on_target,
             expected_assists=expected_assists,
