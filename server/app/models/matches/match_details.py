@@ -1,5 +1,5 @@
 from sqlalchemy.orm import foreign
-from typing import Optional, TYPE_CHECKING, List, Dict
+from typing import Optional, TYPE_CHECKING, List, Dict, Any
 from sqlmodel import Relationship, SQLModel, Field, JSON, Column
 from sqlalchemy import ForeignKey, Integer
 
@@ -32,8 +32,15 @@ class MatchDetailsBase(SQLModel):
     # 승부차기 결과 요약 (예: "Pen 6 - 5")
     penalty_shootout_reason: Optional[str] = Field(default=None)
 
+    # --- 개별 주요 지표 컬럼 (집계용) ---
     # 기대 득점 (xG) 수치
     expected_goals_value: Optional[float] = Field(default=None)
+
+    # 기대 어시스트 (xA) 수치
+    expected_assists_value: Optional[float] = Field(default=None)
+
+    # 기대 유효슈팅 (xGOT) 수치
+    expected_goals_on_target_value: Optional[float] = Field(default=None)
 
     # 볼 점유율 (%)
     possession: Optional[float] = Field(default=None)
@@ -71,6 +78,25 @@ class MatchDetailsBase(SQLModel):
     # 오프사이드
     offsides: Optional[int] = Field(default=None)
 
+    # --- 구조화된 상세 스탯 (JSON) ---
+    # 공격 스탯 (shots, goals, assists 등)
+    attack_stats: Dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
+    
+    # 패스 스탯 (total_passes, accurate_passes, accuracies 등)
+    passing_stats: Dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
+    
+    # 수비 스탯 (tackles, interceptions, clearances, blocks, saves 등)
+    defense_stats: Dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
+    
+    # 듀얼 스탯 (total, aerial, ground 등)
+    duel_stats: Dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
+    
+    # 징계 스탯 (fouls, cards 등)
+    discipline_stats: Dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
+    
+    # 기타/일반 스탯 (corners, offsides, big_chances 등)
+    general_stats: Dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
+
     # --- 선수 명단 및 레이팅 (ID 기반) ---
     # 선발 선수 ID 리스트
     starting_players: List[int] = Field(default_factory=list, sa_column=Column(JSON))
@@ -83,6 +109,12 @@ class MatchDetailsBase(SQLModel):
 
     # 라인업 기반 전력 레이팅 (선수들의 개별 레이팅 가중 평균)
     lineup_power_rating: Optional[float] = Field(default=None)
+
+    # 팀 포메이션 (예: "3-5-2")
+    formation: Optional[str] = Field(default=None, max_length=16)
+
+    # 팀 전체 평점 (lineup.homeTeam.rating)
+    team_rating: Optional[float] = Field(default=None)
 
 class MatchDetails(MatchDetailsBase, TimestampMixin, table=True):
     __tablename__ = "match_details"

@@ -1,4 +1,4 @@
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, Tuple
 from datetime import datetime, timezone
 
 from server.app.models import (
@@ -221,105 +221,202 @@ class FotMobCrawler:
             raise Exception(f"Failed to get match details: {response.status_code} - {response.text}")
         
         data = response.json()
+
+        # 1. 기본 매치 정보 (General)
         general = data.get("general") or {}
+        home_team_id = general.get("homeTeam", {}).get("id")
+        away_team_id = general.get("awayTeam", {}).get("id")
+        match_date_str = general.get("matchTimeUTCDate")
+        match_date = datetime.fromisoformat(match_date_str.replace('Z', '+00:00')) if match_date_str else datetime.now(timezone.utc)
+
+        # 2. 상단 스코어보드 정보 (Header)
         header = data.get("header") or {}
+        header_teams = header.get("teams", [{}, {}])
         status = header.get("status") or {}
+        reason = status.get("reason") or {}
+        penalties = reason.get("penalties") # [home, away]
+        is_finished = status.get("finished", False)
+
+        # 4. 핵심 상세 데이터 (Content)
         content = data.get("content") or {}
         match_facts = content.get("matchFacts") or {}
         info_box = match_facts.get("infoBox") or {}
-        
         lineup = content.get("lineup") or {}
+        
+        # 4-3. 팀 통계 추출 (통합 구조 기반)
+        stats_content = content.get("stats") or {}
+        periods = stats_content.get("Periods") or {}
+        all_stats_raw = periods.get("All", {}).get("stats", [])
+
+        def parse_team_stats(stats_list: List[Dict]) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+            """Periods.All.stats 리스트에서 그룹화 및 개별 지표를 한 번에 추출"""
+            h_res, a_res = {}, {}
+            # 결과 구조 초기화 (JSON 그룹 및 개별 필드)
+            for d in [h_res, a_res]:
+                d.update({
+                    "attack_stats": {}, "passing_stats": {}, "defense_stats": {},
+                    "duel_stats": {}, "discipline_stats": {}, "general_stats": {},
+                    "expected_goals_value": 0.0, "expected_assists_value": 0.0, "expected_goals_on_target_value": 0.0,
+                    "possession": None, "shots_total": 0, "shots_on_target": 0,
+                    "big_chances": 0, "big_chances_missed": 0, "corners": 0,
+                    "fouls": 0, "yellow_cards": 0, "red_cards": 0,
+                    "accurate_passes": 0, "total_passes": 0, "offsides": 0,
+                    "formation": None, "team_rating": None
+                })
+
+            # 지표별 그룹 매핑: (JSON그룹, 그룹내필드, 개별컬럼필드)
+            category_map = {
+                # 공격
+                "total_shots": ("attack_stats", "shots_total", "shots_total"),
+                "Shots": ("attack_stats", "shots_total", "shots_total"), # Fallback
+                "ShotsOnTarget": ("attack_stats", "shots_on_target", "shots_on_target"),
+                "ShotsOffTarget": ("attack_stats", "shots_off_target", None),
+                "blocked_shots": ("attack_stats", "shots_blocked", None),
+                "shots_inside_box": ("attack_stats", "shots_inside_box", None),
+                "shots_outside_box": ("attack_stats", "shots_outside_box", None),
+                "big_chance": ("attack_stats", "big_chances", "big_chances"),
+                "big_chance_missed_title": ("attack_stats", "big_chances_missed", "big_chances_missed"),
+                # 수비
+                "matchstats.headers.tackles": ("defense_stats", "tackles", None),
+                "interceptions": ("defense_stats", "interceptions", None),
+                "clearances": ("defense_stats", "clearances", None),
+                "shot_blocks": ("defense_stats", "blocks", None),
+                "keeper_saves": ("defense_stats", "keeper_saves", None),
+                # 듀얼
+                "duel_won": ("duel_stats", "duels_won_total", None),
+                "aerials_won": ("duel_stats", "duels_aerial_won", None),
+                "ground_duels_won": ("duel_stats", "duels_ground_won", None),
+                # 징계
+                "fouls": ("discipline_stats", "fouls", "fouls"),
+                "yellow_cards": ("discipline_stats", "yellow_cards", "yellow_cards"),
+                "red_cards": ("discipline_stats", "red_cards", "red_cards"),
+                # 일반
+                "corners": ("general_stats", "corners", "corners"),
+                "Offsides": ("general_stats", "offsides", "offsides")
+            }
+
+            for group in stats_list:
+                for stat in group.get("stats", []):
+                    key = stat.get("key")
+                    # stats 리스트([h, a]) 혹은 stat 딕셔너리({"home": h, "away": a}) 모두 대응
+                    vals = stat.get("stats")
+                    if not vals and stat.get("stat"):
+                        s = stat["stat"]
+                        if isinstance(s, dict):
+                            vals = [s.get("home"), s.get("away")]
+                    
+                    if not vals:
+                        vals = [None, None]
+                    if not key: continue
+
+                    # A. 그룹 매핑 처리
+                    if key in category_map:
+                        cat, g_field, f_field = category_map[key]
+                        h_res[cat][g_field], a_res[cat][g_field] = vals[0], vals[1]
+                        if f_field:
+                            try:
+                                h_res[f_field] = int(vals[0]) if vals[0] is not None else 0
+                                a_res[f_field] = int(vals[1]) if vals[1] is not None else 0
+                            except (ValueError, TypeError):
+                                h_res[f_field], a_res[f_field] = vals[0], vals[1]
+
+                    # B. 특수 처리
+                    elif key.lower() in ["ballpossession", "ballpossesion"]:
+                        def parse_pos(v):
+                            if v is None: return None
+                            try: return float(str(v).replace("%", ""))
+                            except: return None
+                        h_res["possession"], a_res["possession"] = parse_pos(vals[0]), parse_pos(vals[1])
+                        h_res["general_stats"]["possession"], a_res["general_stats"]["possession"] = h_res["possession"], a_res["possession"]
+                    
+                    elif key == "accurate_passes":
+                        for i, (v, target_res) in enumerate(zip(vals, [h_res, a_res])):
+                            if isinstance(v, str) and "(" in v:
+                                try:
+                                    acc = int(v.split("(")[0].strip())
+                                    pct = float(v.split("(")[1].replace("%)", ""))
+                                    target_res["passing_stats"]["accurate_passes"] = acc
+                                    target_res["passing_stats"]["accuracy_percent"] = pct
+                                    target_res["accurate_passes"] = acc
+                                except: pass
+                            elif isinstance(v, (int, float)):
+                                target_res["passing_stats"]["accurate_passes"] = int(v)
+                                target_res["accurate_passes"] = int(v)
+                    
+                    elif key == "passes":
+                        try:
+                            h_res["total_passes"] = int(vals[0]) if vals[0] is not None else 0
+                            a_res["total_passes"] = int(vals[1]) if vals[1] is not None else 0
+                            h_res["passing_stats"]["total_passes"] = h_res["total_passes"]
+                            a_res["passing_stats"]["total_passes"] = a_res["total_passes"]
+                        except: pass
+                    
+                    elif key == "long_balls_accurate":
+                        h_res["passing_stats"]["long_balls_accuracy"], a_res["passing_stats"]["long_balls_accuracy"] = vals[0], vals[1]
+                    
+                    elif key == "accurate_crosses":
+                        h_res["passing_stats"]["crosses_accuracy"], a_res["passing_stats"]["crosses_accuracy"] = vals[0], vals[1]
+
+                    # C. 기대 지표 (유연한 키 대응 및 float 변환)
+                    elif key.lower() in ["expected_goals", "expectedgoals", "xg", "expected_goals_all"]:
+                        try:
+                            h_xg = float(vals[0]) if vals[0] is not None else 0.0
+                            a_xg = float(vals[1]) if vals[1] is not None else 0.0
+                            h_res["attack_stats"]["xG"], a_res["attack_stats"]["xG"] = h_xg, a_xg
+                            h_res["expected_goals_value"], a_res["expected_goals_value"] = h_xg, a_xg
+                        except (ValueError, TypeError): pass
+                    
+                    elif key.lower() in ["expected_assists", "expectedassists", "xa"]:
+                        try:
+                            h_xa = float(vals[0]) if vals[0] is not None else 0.0
+                            a_xa = float(vals[1]) if vals[1] is not None else 0.0
+                            h_res["attack_stats"]["xA"], a_res["attack_stats"]["xA"] = h_xa, a_xa
+                            h_res["expected_assists_value"], a_res["expected_assists_value"] = h_xa, a_xa
+                        except (ValueError, TypeError): pass
+                    
+                    elif key.lower() in ["expected_goals_on_target", "expectedgoalsontarget", "xgot"]:
+                        try:
+                            h_xgot = float(vals[0]) if vals[0] is not None else 0.0
+                            a_xgot = float(vals[1]) if vals[1] is not None else 0.0
+                            h_res["attack_stats"]["xGOT"], a_res["attack_stats"]["xGOT"] = h_xgot, a_xgot
+                            h_res["expected_goals_on_target_value"], a_res["expected_goals_on_target_value"] = h_xgot, a_xgot
+                        except (ValueError, TypeError): pass
+            
+            return h_res, a_res
+            
+            return h_res, a_res
+
+        home_stats, away_stats = parse_team_stats(all_stats_raw)
+
+        # 4-4. 라인업 파싱
         home_lineup_raw = lineup.get("homeTeam") or {}
         away_lineup_raw = lineup.get("awayTeam") or {}
-        
-        home_team_id = general.get("homeTeam", {}).get("id")
-        away_team_id = general.get("awayTeam", {}).get("id")
 
-        # 1. 선수 데이터 파싱
+        # 포메이션 및 팀 평점 추가
+        for stats_dict, lineup_raw in zip([home_stats, away_stats], [home_lineup_raw, away_lineup_raw]):
+            stats_dict["general_stats"]["formation"] = lineup_raw.get("formation")
+            stats_dict["general_stats"]["team_rating"] = lineup_raw.get("rating")
+            stats_dict["formation"] = lineup_raw.get("formation")
+            stats_dict["team_rating"] = lineup_raw.get("rating")
+        
         home_starters_data = self._parse_lineup_players(home_lineup_raw.get("starters", []), home_team_id)
         home_subs_data = self._parse_lineup_players(home_lineup_raw.get("subs", []), home_team_id)
         away_starters_data = self._parse_lineup_players(away_lineup_raw.get("starters", []), away_team_id)
         away_subs_data = self._parse_lineup_players(away_lineup_raw.get("subs", []), away_team_id)
-        
-        # 모든 Player 객체 (기본 정보 업데이트용)
+
         all_players = [d["player"] for d in (home_starters_data + home_subs_data + away_starters_data + away_subs_data)]
-        
-        # 명단 ID 리스트 및 평점 맵 구성
         home_starter_ids = [d["id"] for d in home_starters_data]
         home_sub_ids = [d["id"] for d in home_subs_data]
         away_starter_ids = [d["id"] for d in away_starters_data]
         away_sub_ids = [d["id"] for d in away_subs_data]
-        
-        player_ratings = {}
-        for d in (home_starters_data + home_subs_data + away_starters_data + away_subs_data):
-            if d["rating"]:
-                player_ratings[str(d["id"])] = d["rating"]
 
-        # 2. 라인업 파워 레이팅 계산
-        home_power_rating = self._calculate_lineup_power_rating(home_lineup_raw.get("starters", []))
-        away_power_rating = self._calculate_lineup_power_rating(away_lineup_raw.get("starters", []))
-        
-        # 3. 통계 추출
-        stats_content = content.get("stats") or {}
-        teams_stats = stats_content.get("teams") or {}
-        home_team_stats_raw = teams_stats.get("home") or {}
-        away_team_stats_raw = teams_stats.get("away") or {}
+        player_ratings = {str(d["id"]): d["rating"] for d in (home_starters_data + home_subs_data + away_starters_data + away_subs_data) if d["rating"]}
 
-        def extract_stats(stats_list: List[Dict]) -> Dict[str, Any]:
-            """FotMob stats 리스트에서 필요한 지표 추출"""
-            extracted = {}
-            for group in stats_list:
-                for stat in group.get("stats", []):
-                    title = stat.get("title")
-                    val = stat.get("stat", {}).get("value")
-                    if val is None:
-                        continue
-                        
-                    try:
-                        if title == "Ball possession": 
-                            extracted["possession"] = float(val.replace("%", "")) if isinstance(val, str) else float(val)
-                        elif title == "Total shots": 
-                            extracted["shots_total"] = int(val)
-                        elif title == "Shots on target": 
-                            extracted["shots_on_target"] = int(val)
-                        elif title == "Big chances": 
-                            extracted["big_chances"] = int(val)
-                        elif title == "Big chances missed": 
-                            extracted["big_chances_missed"] = int(val)
-                        elif title == "Accurate passes": 
-                            if isinstance(val, str) and "/" in val:
-                                extracted["accurate_passes"] = int(val.split("/")[0])
-                            else:
-                                extracted["accurate_passes"] = int(val)
-                        elif title == "Total passes": 
-                            if isinstance(val, str) and "/" in val:
-                                # "345/412" 형태인 경우 분모 추출
-                                extracted["total_passes"] = int(val.split("/")[1].split()[0])
-                            else:
-                                extracted["total_passes"] = int(val)
-                        elif title == "Corners": 
-                            extracted["corners"] = int(val)
-                        elif title == "Offsides": 
-                            extracted["offsides"] = int(val)
-                        elif title == "Fouls committed": 
-                            extracted["fouls"] = int(val)
-                        elif title == "Yellow cards": 
-                            extracted["yellow_cards"] = int(val)
-                        elif title == "Red cards": 
-                            extracted["red_cards"] = int(val)
-                    except (ValueError, AttributeError, IndexError):
-                        continue
-            return extracted
+        # MOM 정보
+        potm_info = match_facts.get("playerOfTheMatch") or {}
+        potm_player_id = potm_info.get("id")
 
-        home_stats = extract_stats(home_team_stats_raw.get("stats", []))
-        away_stats = extract_stats(away_team_stats_raw.get("stats", []))
-
-        # 4. MatchInfos 생성
-        match_date_str = general.get("matchTimeUTCDate")
-        match_date = datetime.fromisoformat(match_date_str.replace('Z', '+00:00')) if match_date_str else datetime.now(timezone.utc)
-        
-        is_finished = general.get("finished", False)
-
+        # 모델 객체 생성 - MatchInfos
         match_info = MatchInfos(
             id=match_id,
             match_date=match_date,
@@ -329,78 +426,62 @@ class FotMobCrawler:
             match_time_utc=general.get("matchTimeUTC"),
             stadium=(info_box.get("Stadium") or {}).get("name"),
             referee=info_box.get("Referee", {}).get("text"),
-            attendance=home_team_stats_raw.get("attendance") or info_box.get("Attendance"),
+            attendance=info_box.get("Attendance"),
             weather=info_box.get("Weather"),
-            next_match=not general.get("started") and not general.get("finished"),
+            next_match=not status.get("started") and not is_finished,
             finished=is_finished,
             cancelled=status.get("cancelled", False),
             halfs_info=status.get("halfs"),
-            events=(match_facts.get("events") or {}).get("events"),
+            events=(content.get("events") or {}).get("events"),
             shotmap=content.get("shotmap"),
             home_team_id=home_team_id,
             away_team_id=away_team_id
         )
 
-        # 5. MatchDetails 생성 (홈/어웨이)
-        header_teams = header.get("teams", [{}, {}])
-        home_header_score = header_teams[0].get("score")
-        away_header_score = header_teams[1].get("score")
-        
-        reason = status.get("reason") or {}
-        penalties = reason.get("penalties") # [home, away]
-        
-        # MOM 정보 추출
-        potm_info = match_facts.get("playerOfTheMatch") or {}
-        potm_player_id = potm_info.get("id")
-        
+        # 모델 객체 생성 - MatchDetails (Home)
         home_details = MatchDetails(
             id=match_id,
             team_id=home_team_id,
             is_home=True,
-            score=home_header_score if home_header_score is not None else 0,
+            score=header_teams[0].get("score", 0),
             penalty_score=penalties[0] if penalties else None,
             is_penalty_loser=status.get("whoLostOnPenalties") == header_teams[0].get("name"),
             score_str=status.get("scoreStr"),
             penalty_shootout_reason=reason.get("long"),
-            expected_goals_value=home_team_stats_raw.get("expectedGoals"),
+            # 모든 스탯 데이터 (JSON 그룹 + 개별 컬럼) 언패킹
             **home_stats,
             starting_players=home_starter_ids,
             substitute_players=home_sub_ids,
             player_ratings=player_ratings,
-            lineup_power_rating=home_power_rating,
+            lineup_power_rating=self._calculate_lineup_power_rating(home_lineup_raw.get("starters", [])),
             potm_player_id=potm_player_id if potm_info.get("teamId") == home_team_id else None
         )
 
+        # 모델 객체 생성 - MatchDetails (Away)
         away_details = MatchDetails(
             id=match_id,
             team_id=away_team_id,
             is_home=False,
-            score=away_header_score if away_header_score is not None else 0,
+            score=header_teams[1].get("score", 0),
             penalty_score=penalties[1] if penalties else None,
             is_penalty_loser=status.get("whoLostOnPenalties") == header_teams[1].get("name"),
             score_str=status.get("scoreStr"),
             penalty_shootout_reason=reason.get("long"),
-            expected_goals_value=away_team_stats_raw.get("expectedGoals"),
+            # 모든 스탯 데이터 (JSON 그룹 + 개별 컬럼) 언패킹
             **away_stats,
             starting_players=away_starter_ids,
             substitute_players=away_sub_ids,
             player_ratings=player_ratings,
-            lineup_power_rating=away_power_rating,
+            lineup_power_rating=self._calculate_lineup_power_rating(away_lineup_raw.get("starters", [])),
             potm_player_id=potm_player_id if potm_info.get("teamId") == away_team_id else None
         )
 
-        # 6. PlayerMatchDetails 생성 (선수별 경기 상세 스탯)
+        # 4-5. 선수별 상세 스탯 (PlayerMatchDetails)
         player_match_details_list = []
-        
-        # 경기가 종료된 경우에만 선수별 상세 스탯 추출
         if is_finished:
-            # shotmap 데이터 가져오기
             shotmap_data = content.get("shotmap") or {}
-            
-            # 선수별 상세 통계 추출 (FotMob API의 playerStats 섹션에서)
             player_stats_section = content.get("playerStats") or {}
-
-            # 모든 선발/교체 ID 통합 (홈/어웨이 구분 없이 처리하기 위함)
+            
             all_starters = set(home_starter_ids + away_starter_ids)
             all_subs = set(home_sub_ids + away_sub_ids)
 
@@ -414,11 +495,9 @@ class FotMobCrawler:
                     potm_player_id=potm_player_id,
                     shotmap_data=shotmap_data
                 )
-
                 if player_match_detail:
                     player_match_details_list.append(player_match_detail)
 
-        # 모든 모델 객체를 하나의 리스트로 합쳐서 반환
         result = [match_info, home_details, away_details]
         result.extend(all_players)
         result.extend(player_match_details_list)
