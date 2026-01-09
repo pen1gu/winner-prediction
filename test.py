@@ -10,11 +10,11 @@ logger = get_logger(__name__)
 
 async def main():
 
-    team_id = 9825
+    team_id = 9857
 
     crawler = FotMobCrawler()
 
-    # await fetch_team_overview_task(team_id)
+    await fetch_team_overview_task(team_id)
 
     await fetch_matches_by_team_id_task(team_id)
         
