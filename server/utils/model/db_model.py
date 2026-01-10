@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Optional
 from datetime import datetime
-import sqlalchemy as sa
+from sqlalchemy import DateTime, text
 from sqlmodel import Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,12 +12,12 @@ class TimestampMixin:
 
     created_at: Optional[datetime] = Field(
         default=None, 
-        sa_type=sa.DateTime(timezone=True),
-        sa_column_kwargs={"server_default": sa.text("now()")}
+        sa_type=DateTime(timezone=True),
+        sa_column_kwargs={"server_default": text("now()")}
     )
     updated_at: Optional[datetime] = Field(
         default=None, 
-        sa_type=sa.DateTime(timezone=True),
-        sa_column_kwargs={"server_default": sa.text("now()"), "onupdate": sa.text("now()")}
+        sa_type=DateTime(timezone=True),
+        sa_column_kwargs={"server_default": text("now()"), "onupdate": text("now()")}
     )
 

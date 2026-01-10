@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from server.app.models.teams.team import Team
 
 class PlayerMatchAffectFeaturesBase(SQLModel):
-    """선수 경기 영향 요소 기본"""
+    """선수 경기 영향 요소 (고도화에서 사용 시 필요하지 않을까 해서 빼둠)"""
     # 성적 추이
     performance_trend: Optional[List[Dict]] = Field(default=None, sa_column=Column(JSON))
     
@@ -45,10 +45,8 @@ class PlayerMatchAffectFeatures(PlayerMatchAffectFeaturesBase, TimestampMixin, t
     """선수 경기 영향 요소 - SQLModel (DB + API)"""
     __tablename__ = "player_match_affect_features"
     
-    id: Optional[int] = Field(default=None, primary_key=True)
-    
-    # 선수 FK (players.id 참조)
-    player_id: int = Field(sa_column=Column(Integer, ForeignKey("players.id", ondelete="CASCADE"), nullable=False))
+    # Player.id를 참조하는 FK이면서 PK
+    id: int = Field(sa_column=Column(Integer, ForeignKey("players.id", ondelete="CASCADE"), primary_key=True))
     
     # 팀 FK (teams.id 참조)
     team_id: Optional[int] = Field(default=None, sa_column=Column(Integer, ForeignKey("teams.id", ondelete="SET NULL"), nullable=True))

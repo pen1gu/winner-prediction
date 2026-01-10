@@ -5,13 +5,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from server.config.settings import settings
 from sqlmodel import SQLModel
 
-from server.app.models import (  # noqa: F401
-    Team,
-    Player,
-    PlayerDetails,
-    PlayerMatchAffectFeatures,
-    Manager,
-)
+from server.app.models import *
 
 
 async def init_database() -> None:

@@ -1,70 +1,37 @@
-from typing import Optional, List, Dict, TYPE_CHECKING
-from sqlmodel import SQLModel, Field, Relationship, JSON, Column
-from sqlalchemy import String, ForeignKey, Integer
+from typing import Optional, List, TYPE_CHECKING
+from sqlmodel import SQLModel, Field, Relationship
 
 from server.utils.model.db_model import TimestampMixin
 
 if TYPE_CHECKING:
-    from server.app.models.teams.team import Team
-    from .player_details import PlayerDetails
+    from .player_info import PlayerInfos
     from .player_match_affect_features import PlayerMatchAffectFeatures
+    from .player_match_details import PlayerMatchDetails
 
 class PlayerBase(SQLModel):
-    """선수 기본 정보"""
+    """Player 선수 식별자 (마스터 테이블)"""
     # FotMob ID를 id(PK)로 사용
     id: int = Field(primary_key=True, index=True)
-    
-    # 이름
-    name: str = Field(max_length=255, nullable=False)
-    
-    # 나이
-    age: Optional[int] = Field(default=None)
-    
-    # 포지션 정보 (JSON으로 저장)
-    position: Optional[List[str]] = Field(default=None, sa_column=Column(JSON))
-    
-    # 역할 상세 (JSON으로 저장)
-    role: Optional[Dict[str, str]] = Field(default=None, sa_column=Column(JSON))
-    
-    # 등번호
-    shirt_number: Optional[int] = Field(default=None)
-    
-    # 키
-    height: Optional[int] = Field(default=None)
-    
-    # 몸무게
-    weight: Optional[int] = Field(default=None)
-    
-    # 생년월일 (문자열로 저장)
-    birth_date: Optional[str] = Field(default=None, max_length=32)
-    
-    # 출생지
-    birth_place: Optional[str] = Field(default=None, max_length=255)
-    
-    # 출생국
-    birth_country: Optional[str] = Field(default=None, max_length=128)
-    
-    # 출생 지역
-    birth_state: Optional[str] = Field(default=None, max_length=128)
 
 
 class Player(PlayerBase, TimestampMixin, table=True):
-    """선수 정보 - SQLModel (DB + API)"""
+    """선수 식별자 - SQLModel (DB + API)"""
     __tablename__ = "players"
     
-    # 소속 팀 FK (teams.id 참조)
-    team_id: Optional[int] = Field(default=None, sa_column=Column(Integer, ForeignKey("teams.id", ondelete="SET NULL")))
-    
-    # Relationships
-    team: Optional["Team"] = Relationship(
-        back_populates="players",
-        sa_relationship_kwargs={"lazy": "select"}
-    )
-    details: Optional["PlayerDetails"] = Relationship(
+    # 선수 기본 정보 (1:1)
+    info: Optional["PlayerInfos"] = Relationship(
         back_populates="player",
         sa_relationship_kwargs={"uselist": False, "cascade": "all, delete-orphan", "lazy": "select"}
     )
-    match_affect_features: List["PlayerMatchAffectFeatures"] = Relationship(
+    
+    # 경기 영향 요소 (1:1)
+    match_affect_features: Optional["PlayerMatchAffectFeatures"] = Relationship(
+        back_populates="player",
+        sa_relationship_kwargs={"uselist": False, "cascade": "all, delete-orphan", "lazy": "select"}
+    )
+    
+    # 경기별 상세 성과 (1:N)
+    match_details: List["PlayerMatchDetails"] = Relationship(
         back_populates="player",
         sa_relationship_kwargs={"cascade": "all, delete-orphan", "lazy": "select"}
     )

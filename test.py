@@ -2,23 +2,23 @@ from server.app.crawler.fotmob import FotMobCrawler
 from server.app.models import Player
 import asyncio
 
+from server.app.tasks.task import fetch_matches_by_team_id_task, fetch_team_overview_task
+
 from server.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
 async def main():
 
-    team_id = 4947174
+    team_id = 9857
 
     crawler = FotMobCrawler()
-    response = await crawler.get_next_match_info_by_match_id(team_id)
-    
-    # team = await crawler.get_team_info_by_team_id(team_id, response)
-    # players_info = await crawler.get_manager_info_by_team_id(team, response)
-    # print(players_info)
 
-    # result = await get_next_match_info_by_match_id(team_id)
-    # print(result)
+    await fetch_team_overview_task(team_id)
+
+    await fetch_matches_by_team_id_task(team_id)
+        
+    
 
 if __name__ == "__main__":
     asyncio.run(main())
