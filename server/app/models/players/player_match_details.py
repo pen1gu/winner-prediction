@@ -1,6 +1,6 @@
 from typing import Optional, List, Dict, TYPE_CHECKING
 from sqlmodel import SQLModel, Field, Relationship, JSON, Column
-from sqlalchemy import ForeignKey, Integer, UniqueConstraint, ForeignKeyConstraint
+from sqlalchemy import ForeignKey, Integer, ForeignKeyConstraint
 
 from server.utils.model.db_model import TimestampMixin
 

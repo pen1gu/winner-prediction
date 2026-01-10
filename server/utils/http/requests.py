@@ -1,6 +1,5 @@
 import httpx
 from typing import Dict, Optional, Any
-from urllib.parse import urlencode
 
 from server.config.settings import settings
 
