@@ -4,6 +4,7 @@ from server.app.models.teams.manager import Manager, ManagerBase
 from server.app.models.players.player_info import PlayerInfos, PlayerInfosBase
 from server.app.models.players.player_match_details import PlayerMatchDetails, PlayerMatchDetailsBase
 from server.app.models.players.player_match_affect_features import PlayerMatchAffectFeatures, PlayerMatchAffectFeaturesBase
+from server.app.models.players.player_rating import PlayerRating, PlayerRatingBase
 from server.app.models.bets.bet import Bets, BetsBase
 from server.app.models.matches.match_logs import MatchLogs, MatchLogsBase
 from server.app.models.matches.match_details import MatchDetails, MatchDetailsBase
@@ -30,6 +31,8 @@ __all__ = [
     "PlayerMatchDetailsBase",
     "PlayerMatchAffectFeatures",
     "PlayerMatchAffectFeaturesBase",
+    "PlayerRating",
+    "PlayerRatingBase",
     "Bets",
     "BetsBase",
     "MatchLogs",

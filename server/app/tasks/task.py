@@ -2,6 +2,9 @@ from server.app.crawler.fotmob import FotMobCrawler
 from server.app.store.db_query import get_already_fetched_player_ids, get_already_fetched_team_ids
 from server.utils.logger import get_logger
 from server.app.store.db_store import save
+from server.app.store.db_query import get_player_by_id
+from server.app.compute.player_rating import compute_player_rating
+from server.app.models.players.player_rating import PlayerRating
 logger = get_logger(__name__)
 
 
@@ -85,9 +88,58 @@ async def fetch_matches_by_team_id_task(team_id: int) -> dict:
     logger.info(f"Successfully fetched matches for team_id: {team_id}")
 
 
+async def compute_player_rating_task(player_id: int) -> None:
+    """
+    description: 선수 ID를 받아서 선수의 rating을 계산하는 task
+    
+    Args:
+        player_id: 선수 ID
+    Returns:
+        None
+    """
+    player = await get_player_by_id(player_id)
+    if player is None:
+        logger.warning(f"Player not found: {player_id}")
+        return
+
+    rating = await compute_player_rating(player)
+
+    # rating은 별도 테이블(player_ratings)에 히스토리로 누적 저장한다.
+    pr = PlayerRating(
+        player_id=player_id,
+        rating=rating,
+        algorithm_version="v1",
+    )
+    await save(pr)
+    logger.info(f"Saved player rating history. player_id={player_id} rating={rating}")
+
+
+async def compute_all_player_ratings_task() -> None:
+    """
+    description: DB에 존재하는 모든 선수의 rating을 계산해서 저장하는 task
+    """
+    player_ids = await get_already_fetched_player_ids()
+    if not player_ids:
+        logger.warning("No players found in DB; skip computing ratings.")
+        return
+
+    saved = 0
+    skipped = 0
+    for pid in player_ids:
+        try:
+            await compute_player_rating_task(pid)
+            saved += 1
+        except Exception as e:
+            skipped += 1
+            logger.exception(f"Failed computing/saving rating. player_id={pid} err={e!r}")
+
+    logger.info(f"Finished computing all player ratings. total={len(player_ids)} ok={saved} failed={skipped}")
+
+
 tasks = [
     {
         "fetch_team_overview": fetch_team_overview_task,
         "fetch_matches_by_team_id": fetch_matches_by_team_id_task,
+        "compute_all_player_ratings": compute_all_player_ratings_task,
     },
 ]
