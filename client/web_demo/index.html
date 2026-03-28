@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Winner Prediction Demo</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <main class="container">
+    <header class="header">
+      <h1>Winner Prediction Web Demo</h1>
+      <p>서버 DB에서 최근 경기 데이터를 불러와 요약합니다.</p>
+    </header>
+
+    <section class="controls">
+      <label for="limitSelect">최근 경기 수</label>
+      <select id="limitSelect">
+        <option value="5">5</option>
+        <option value="10" selected>10</option>
+        <option value="20">20</option>
+      </select>
+      <button id="reloadBtn">다시 불러오기</button>
+      <span id="statusText" class="status">대기 중</span>
+    </section>
+
+    <section id="matches" class="matches"></section>
+  </main>
+
+  <template id="matchCardTemplate">
+    <article class="match-card">
+      <div class="match-top">
+        <div class="teams"></div>
+        <div class="score"></div>
+      </div>
+      <div class="meta"></div>
+      <div class="stats"></div>
+    </article>
+  </template>
+
+  <script src="/app.js"></script>
+</body>
+</html>
