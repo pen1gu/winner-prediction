@@ -1,0 +1,49 @@
+---
+description: FastAPI 라우터 및 엔드포인트 작성 규칙
+globs: app/**/*.py
+alwaysApply: false
+---
+
+# FastAPI 스타일 가이드
+
+## 라우터 구조
+
+- 라우터는 `onpick_rest/apis/<도메인>/router.py`에 위치한다.
+- `APIRouter(prefix="/<복수명사>", tags=["<PascalCase>"])` 형태로 선언한다.
+- `onpick_rest/apis/__init__.py`의 `routers` 리스트에 등록한다.
+- 기본적으로 API 를 구성할 때 GET, POST, PATCH, PUT, DELETE가 필요한지 검토를 진행하고 상황에 맞게 추가한다. 
+
+## 의존성 주입 (Depends)
+
+```python
+# ✅ GOOD - 함수 시그니처에서 명시적으로 선언
+async def get_items(
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+
+# ❌ BAD - 함수 내부에서 직접 세션/유저 획득
+async def get_items():
+    session = next(get_session())
+```
+
+## 응답 모델
+
+- 모든 엔드포인트는 `response_model`을 명시한다.
+- Read 모델(`XxxRead`)은 `model_config = ConfigDict(from_attributes=True)` 포함.
+- 생성은 `status_code=status.HTTP_201_CREATED`, 삭제는 `status_code=status.HTTP_204_NO_CONTENT`.
+
+## 에러 처리
+
+```python
+# ✅ GOOD
+raise HTTPException(status_code=404, detail="리소스를 찾을 수 없습니다.")
+
+# ❌ BAD - 한국어 detail 없이 영문만
+raise HTTPException(status_code=404, detail="Not found")
+```
+
+## 비동기
+
+- DB 쿼리는 반드시 `await session.execute(...)` 형태로 비동기 처리.
+- `AsyncSession`을 사용하고, `Session`(동기)은 사용하지 않는다.

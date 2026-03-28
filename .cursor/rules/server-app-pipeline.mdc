@@ -1,0 +1,21 @@
+---
+description: server/app 모델·크롤러·태스크·스토어·compute 필드 정합성
+globs: server/app/**/*.py
+alwaysApply: false
+---
+
+# server/app 파이프라인
+
+## (A) 크롤러 → 모델
+
+- 크롤러가 조립하는 SQLModel 필드·타입은 `server/app/models/**`와 반드시 맞춘다.
+
+## (B) tasks → db_store
+
+- `task.py` 흐름과 `db_store.save()` / `upsert_model()`을 함께 본다.
+- `__upsert_conflict_cols__`가 없으면 **primary key**가 conflict 기준이므로 PK 변경은 저장 의미를 바꾼다.
+
+## (C) compute ↔ Player
+
+- `compute/player_rating.py`는 모델 속성을 직접 쓴다. 이름 변경 시 모델과 동시에 맞춘다.
+- 특히 다음이 일관되어야 한다: `Player.info.current_market_value`, `Player.match_affect_features.form_rating`, `Player.info.fan_rating`, `Player.info.position`(리스트), `Player.info.age`.
