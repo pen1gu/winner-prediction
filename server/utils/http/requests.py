@@ -1,6 +1,5 @@
 import httpx
 from typing import Dict, Optional, Any
-from urllib.parse import urlencode
 
 from server.config.settings import settings
 
@@ -21,13 +20,13 @@ class FotMobHTTPClient:
         """기본 헤더 생성"""
         return {
             "User-Agent": settings.user_agent,
-            "sec-ch-ua": '"Chromium";v="142", "Google Chrome";v="142", "Not_A Brand";v="99"',
+            "sec-ch-ua": '"Chromium";v="145", "Google Chrome";v="145", "Not_A Brand";v="99"',
             "sec-ch-ua-mobile": "?0",
             "sec-ch-ua-platform": '"Windows"',
             "Accept": "application/json, text/plain, */*",
             "Accept-Language": f"{settings.fotmob_language}-KR,{settings.fotmob_language};q=0.9,en-US;q=0.8,en;q=0.7",
             "Referer": f"{settings.fotmob_base_url}/",
-            "x-mas": "eyJib2R5Ijp7InVybCI6Ii9hcGkvZGF0YS9tYXRjaGVzP2RhdGU9MjAyNTEyMTYmdGltZXpvbmU9QXNpYSUyRlNlb3VsJmNjb2RlMz1LT1IiLCJjb2RlIjoxNzY1ODk1MTI3NDQxLCJmb28iOiJwcm9kdWN0aW9uOjkyNTE4ZTQ2OTYwZTBlNzA1NjQ1NmZkMmRlNzQ3M2MxOTAzZDRlZTIifSwic2lnbmF0dXJlIjoiQjM4Nzc4MzhDM0JDRTc3ODQzMkY0ODBCRDc2MTVFOEYifQ==",
+            "x-mas": "eyJib2R5Ijp7InVybCI6Ii9hcGkvZGF0YS90ZWFtcz9pZD05ODI1JmNjb2RlMz1LT1IiLCJjb2RlIjoxNzc0NTk3MzI2MzQ4LCJmb28iOiJwcm9kdWN0aW9uOjExZTMxNmE5NjRlYzI1NzkzNzE3YWVhMTUxY2Q3ZmIzMGMyYmE3YzYifSwic2lnbmF0dXJlIjoiNzI5QzBFN0ZEM0ZDMTA5QzE2MEEyRjhFNkE2NjlERUIifQ==",
         }
     
     def _merge_headers(self, custom_headers: Optional[Dict[str, str]] = None) -> Dict[str, str]:

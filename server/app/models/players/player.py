@@ -7,6 +7,7 @@ if TYPE_CHECKING:
     from .player_info import PlayerInfos
     from .player_match_affect_features import PlayerMatchAffectFeatures
     from .player_match_details import PlayerMatchDetails
+    from .player_rating import PlayerRating
 
 class PlayerBase(SQLModel):
     """Player 선수 식별자 (마스터 테이블)"""
@@ -32,6 +33,12 @@ class Player(PlayerBase, TimestampMixin, table=True):
     
     # 경기별 상세 성과 (1:N)
     match_details: List["PlayerMatchDetails"] = Relationship(
+        back_populates="player",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan", "lazy": "select"}
+    )
+
+    # 레이팅 히스토리 (1:N)
+    ratings: List["PlayerRating"] = Relationship(
         back_populates="player",
         sa_relationship_kwargs={"cascade": "all, delete-orphan", "lazy": "select"}
     )

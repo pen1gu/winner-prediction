@@ -10,7 +10,7 @@ logger = get_logger(__name__)
 
 async def main():
 
-    team_id = 9857
+    team_id = 9825
 
     crawler = FotMobCrawler()
 

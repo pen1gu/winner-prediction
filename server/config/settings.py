@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     browser_timeout: int = 30000
     
     # User-Agent 설정
-    user_agent: str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+    user_agent: str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36"
     
     # 로깅 설정
     log_level: str = "INFO"

@@ -1,5 +1,6 @@
 import logging
 import sys
+import inspect
 from pathlib import Path
 from typing import Optional
 
@@ -70,7 +71,6 @@ def get_logger(name: str = None) -> logging.Logger:
         Logger 인스턴스
     """
     if name is None:
-        import inspect
         frame = inspect.currentframe().f_back
         name = frame.f_globals.get("__name__", "root")
     
