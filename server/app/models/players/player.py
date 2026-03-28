@@ -39,5 +39,6 @@ class Player(PlayerBase, TimestampMixin, table=True):
 
     # 레이팅 히스토리 (1:N)
     ratings: List["PlayerRating"] = Relationship(
+        back_populates="player",
         sa_relationship_kwargs={"cascade": "all, delete-orphan", "lazy": "select"}
     )

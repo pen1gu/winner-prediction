@@ -1,8 +1,12 @@
 from server.app.crawler.fotmob import FotMobCrawler
-from server.app.store.db_query import get_already_fetched_player_ids, get_already_fetched_team_ids
+from server.app.store.db_query import (
+    get_already_fetched_player_ids,
+    get_already_fetched_team_ids,
+    get_latest_player_rating,
+    get_player_by_id,
+)
 from server.utils.logger import get_logger
 from server.app.store.db_store import save
-from server.app.store.db_query import get_player_by_id
 from server.app.compute.player_rating import compute_player_rating
 from server.app.models.players.player_rating import PlayerRating
 logger = get_logger(__name__)
@@ -104,11 +108,15 @@ async def compute_player_rating_task(player_id: int) -> None:
 
     rating = await compute_player_rating(player)
 
-    # rating은 별도 테이블(player_ratings)에 히스토리로 누적 저장한다.
+    latest = await get_latest_player_rating(player_id)
+    if latest is not None and latest.rating == rating:
+        logger.info(f"Skip player rating insert(same as latest). player_id={player_id} rating={rating}")
+        return
+
+    # rating은 별도 테이블(player_ratings)에 append-only 로그로 누적 저장한다.
     pr = PlayerRating(
         player_id=player_id,
         rating=rating,
-        algorithm_version="v1",
     )
     await save(pr)
     logger.info(f"Saved player rating history. player_id={player_id} rating={rating}")

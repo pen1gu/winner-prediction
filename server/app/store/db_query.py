@@ -3,6 +3,7 @@ from sqlmodel import select
 from server.app.models.session import AsyncSessionLocal
 from server.app.models.teams.team import Team
 from server.app.models.players.player import Player
+from server.app.models.players.player_rating import PlayerRating
 from sqlalchemy.orm import selectinload
 
 async def get_already_fetched_team_ids() -> list[int]:
@@ -38,6 +39,21 @@ async def get_player_by_id(player_id: int) -> Player | None:
                 selectinload(Player.match_affect_features),
                 selectinload(Player.match_details),
             )
+        )
+        res = await session.execute(stmt)
+        return res.scalar_one_or_none()
+
+
+async def get_latest_player_rating(player_id: int) -> PlayerRating | None:
+    """
+    선수의 최신 rating 로그 1건 조회.
+    """
+    async with AsyncSessionLocal() as session:
+        stmt = (
+            select(PlayerRating)
+            .where(PlayerRating.player_id == player_id)
+            .order_by(PlayerRating.created_at.desc(), PlayerRating.id.desc())
+            .limit(1)
         )
         res = await session.execute(stmt)
         return res.scalar_one_or_none()

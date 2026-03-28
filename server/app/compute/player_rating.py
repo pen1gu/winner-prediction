@@ -104,7 +104,7 @@ async def compute_player_rating(player: Player) -> float:
     if info and isinstance(info.age, int) and info.age > 0:
         age = info.age
         # peak=27, 10년 차이나면 약 -40점 수준
-        rating += -4.0 * abs(age - 27)
+        rating += -2.0 * abs(age - 27)
 
     # 3) 가용성/부상 패널티
     if maf and maf.availability_status:
