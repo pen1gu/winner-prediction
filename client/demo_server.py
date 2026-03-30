@@ -7,15 +7,12 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from sqlalchemy.orm import joinedload
-from sqlmodel import select
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from server.app.models import MatchDetails, MatchInfos, MatchLogs
 from server.app.models.session import AsyncSessionLocal
+from server.app.store.db_query import fetch_recent_match_summaries
 
 
 STATIC_DIR = Path(__file__).parent / "web_demo"
@@ -31,53 +28,14 @@ def iso_or_none(value):
 
 async def fetch_recent_matches(limit: int = 10) -> list[dict]:
     async with AsyncSessionLocal() as session:
-        stmt = (
-            select(MatchLogs)
-            .options(
-                joinedload(MatchLogs.match_infos).joinedload(MatchInfos.home_team),
-                joinedload(MatchLogs.match_infos).joinedload(MatchInfos.away_team),
-                joinedload(MatchLogs.match_details),
-            )
-            .order_by(MatchLogs.id.desc())
-            .limit(limit)
-        )
-        result = await session.execute(stmt)
-        matches = result.scalars().unique().all()
-
-        payload: list[dict] = []
-        for match in matches:
-            info = match.match_infos
-            home_detail = next((d for d in match.match_details if d.is_home), None)
-            away_detail = next((d for d in match.match_details if not d.is_home), None)
-
-            payload.append(
-                {
-                    "match_id": match.id,
-                    "home_team": info.home_team.name if info and info.home_team else "Home",
-                    "away_team": info.away_team.name if info and info.away_team else "Away",
-                    "league_name": info.league_name if info else None,
-                    "match_round": info.match_round if info else None,
-                    "match_date": iso_or_none(info.match_date if info else None),
-                    "finished": bool(info.finished) if info else False,
-                    "stadium": info.stadium if info else None,
-                    "score": {
-                        "home": home_detail.score if home_detail else None,
-                        "away": away_detail.score if away_detail else None,
-                    },
-                    "stats": {
-                        "home_xg": home_detail.expected_goals_value if home_detail else None,
-                        "away_xg": away_detail.expected_goals_value if away_detail else None,
-                        "home_possession": home_detail.possession if home_detail else None,
-                        "away_possession": away_detail.possession if away_detail else None,
-                        "home_shots": home_detail.shots_total if home_detail else None,
-                        "away_shots": away_detail.shots_total if away_detail else None,
-                        "home_shots_on_target": home_detail.shots_on_target if home_detail else None,
-                        "away_shots_on_target": away_detail.shots_on_target if away_detail else None,
-                    },
-                }
-            )
-
-        return payload
+        raw = await fetch_recent_match_summaries(session, limit=limit)
+    out = []
+    for row in raw:
+        row = dict(row)
+        md = row.get("match_date")
+        row["match_date"] = iso_or_none(md) if md is not None else None
+        out.append(row)
+    return out
 
 
 def run_async(coro):
@@ -121,6 +79,13 @@ class DemoRequestHandler(BaseHTTPRequestHandler):
 
         if route == "/":
             self._serve_file("index.html")
+            return
+        if route.startswith("/static/"):
+            rel = route[len("/static/") :].lstrip("/")
+            if not rel or ".." in rel:
+                self.send_error(404, "Not Found")
+                return
+            self._serve_file(rel)
             return
         if route == "/app.js":
             self._serve_file("app.js")

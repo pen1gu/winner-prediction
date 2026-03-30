@@ -1,13 +1,12 @@
-from typing import List
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from sqlmodel import select
 
+from server.app.api.prediction.lineup import load_players_for_prediction
 from server.app.compute.player_rating import predict_match_outcomes
-from server.app.models import MatchInfos, MatchLogs, Player
+from server.app.models import MatchInfos, MatchLogs
 from server.app.models.session import get_session
 
 router = APIRouter(prefix="/predictions", tags=["Prediction"])
@@ -22,24 +21,6 @@ class MatchOutcomesRead(BaseModel):
     home: float = Field(description="홈 승 확률 (0~1)")
     draw: float = Field(description="무승부 확률 (0~1)")
     away: float = Field(description="원정 승 확률 (0~1)")
-
-
-async def _get_players_by_ids(
-    session: AsyncSession, player_ids: List[int]
-) -> List[Player]:
-    if not player_ids:
-        return []
-    statement = (
-        select(Player)
-        .where(Player.id.in_(player_ids))
-        .options(
-            joinedload(Player.info),
-            joinedload(Player.match_affect_features),
-            joinedload(Player.match_details),
-        )
-    )
-    result = await session.execute(statement)
-    return list(result.scalars().unique().all())
 
 
 @router.get(
@@ -62,7 +43,10 @@ async def get_match_outcomes(
         )
     )
     result = await session.execute(statement)
-    match = result.scalars().first()
+    try:
+        match = result.scalars().first()
+    finally:
+        await result.close()
 
     if not match:
         raise HTTPException(
@@ -90,8 +74,12 @@ async def get_match_outcomes(
             detail="홈/어웨이 경기 상세 정보가 없습니다.",
         )
 
-    home_players = await _get_players_by_ids(session, home_detail.starting_players)
-    away_players = await _get_players_by_ids(session, away_detail.starting_players)
+    home_players = await load_players_for_prediction(
+        session, home_detail.starting_players
+    )
+    away_players = await load_players_for_prediction(
+        session, away_detail.starting_players
+    )
 
     if not home_players or not away_players:
         raise HTTPException(

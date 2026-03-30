@@ -3,14 +3,17 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Winner Prediction Demo</title>
-  <link rel="stylesheet" href="/styles.css" />
+  <title>Winner Prediction — Web Demo</title>
+  <link rel="stylesheet" href="/static/styles.css" />
 </head>
 <body>
   <main class="container">
     <header class="header">
       <h1>Winner Prediction Web Demo</h1>
-      <p>서버 DB에서 최근 경기 데이터를 불러와 요약합니다.</p>
+      <p>
+        FastAPI 라우터(<code>/api/v1</code>)에서 최근 경기·예측·시각화 데이터를 불러옵니다.
+        서버 실행: <code>poetry run uvicorn server.app.main:app --reload</code> 후 이 페이지를 연다.
+      </p>
     </header>
 
     <section class="controls">
@@ -20,7 +23,7 @@
         <option value="10" selected>10</option>
         <option value="20">20</option>
       </select>
-      <button id="reloadBtn">다시 불러오기</button>
+      <button type="button" id="reloadBtn">다시 불러오기</button>
       <span id="statusText" class="status">대기 중</span>
     </section>
 
@@ -34,10 +37,18 @@
         <div class="score"></div>
       </div>
       <div class="meta"></div>
+      <div class="outcomes-strip" aria-label="예측 승률"></div>
       <div class="stats"></div>
+      <div class="match-actions">
+        <button type="button" class="btn-detail">예측 · 팀 스탯 · 라인업</button>
+      </div>
+      <div class="detail-panel" hidden>
+        <div class="detail-loading">불러오는 중…</div>
+        <div class="detail-content" hidden></div>
+      </div>
     </article>
   </template>
 
-  <script src="/app.js"></script>
+  <script src="/static/app.js"></script>
 </body>
 </html>

@@ -261,7 +261,11 @@ def softmax(logits: List[float]) -> List[float]:
 
 async def get_historical_win_rate(session, team_id: int, is_home: Optional[bool] = None, last_n: int = 50) -> float:
     """
-    특정 팀의 과거 N경기 승률 계산
+    특정 팀의 과거 N경기 승률 계산.
+
+    asyncpg + 단일 AsyncSession에서는 이전 Result를 닫기 전에 루프 안에서
+    추가 execute를 호출하면 "another operation is in progress"가 날 수 있어,
+    상대 팀 득점은 한 번의 조회로 묶는다.
     """
     statement = (
         select(MatchDetails)
@@ -269,24 +273,42 @@ async def get_historical_win_rate(session, team_id: int, is_home: Optional[bool]
     )
     if is_home is not None:
         statement = statement.where(MatchDetails.is_home == is_home)
-    
+
     statement = statement.order_by(MatchDetails.id.desc()).limit(last_n)
     result = await session.execute(statement)
-    details = result.scalars().all()
+    try:
+        details = list(result.scalars())
+    finally:
+        await result.close()
 
     if not details:
         return 0.5
 
+    match_ids = list({d.id for d in details})
+    opp_stmt = select(MatchDetails.id, MatchDetails.team_id, MatchDetails.score).where(
+        MatchDetails.id.in_(match_ids)
+    )
+    opp_res = await session.execute(opp_stmt)
+    try:
+        opp_rows = opp_res.all()
+    finally:
+        await opp_res.close()
+
+    by_match: Dict[int, Dict[int, int]] = {}
+    for row in opp_rows:
+        mid = row[0]
+        tid = row[1]
+        sc = row[2] or 0
+        by_match.setdefault(mid, {})[tid] = int(sc)
+
     wins = 0
     for detail in details:
-        opp_statement = (
-            select(MatchDetails.score)
-            .where(MatchDetails.id == detail.id)
-            .where(MatchDetails.team_id != team_id)
+        scores = by_match.get(detail.id, {})
+        opp_score = next(
+            (s for tid, s in scores.items() if tid != team_id),
+            0,
         )
-        opp_result = await session.execute(opp_statement)
-        opp_score = opp_result.scalar() or 0
-        
+
         if detail.score > opp_score:
             wins += 1
         elif detail.score == opp_score:
