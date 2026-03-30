@@ -39,7 +39,10 @@ async def _get_players_by_ids(
         )
     )
     result = await session.execute(statement)
-    return list(result.scalars().unique().all())
+    try:
+        return list(result.scalars().unique().all())
+    finally:
+        await result.close()
 
 
 async def _load_match_sides(session: AsyncSession, match_id: int) -> _MatchSides:
@@ -53,7 +56,10 @@ async def _load_match_sides(session: AsyncSession, match_id: int) -> _MatchSides
         )
     )
     result = await session.execute(statement)
-    match = result.scalars().first()
+    try:
+        match = result.scalars().first()
+    finally:
+        await result.close()
 
     if not match:
         raise HTTPException(
