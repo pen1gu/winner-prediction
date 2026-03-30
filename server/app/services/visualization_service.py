@@ -2,15 +2,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
 
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
-from sqlmodel import select
 
 from server.app.compute.player_rating import compute_player_rating
-from server.app.models import MatchDetails, MatchInfos, MatchLogs, Player
+from server.app.models import MatchDetails, MatchLogs
+from server.app.repositories.lineup_repository import load_players_for_prediction
+from server.app.repositories.match_repository import (
+    fetch_match_log_by_id_with_teams_and_details,
+)
 from server.app.schemas.visualization import (
     LineupRatingPoint,
     LineupRatingsRead,
@@ -28,7 +29,7 @@ class _MatchSides:
     away_team_name: str
 
 
-def _num(v) -> Optional[float]:
+def _num(v: object) -> float | None:
     if v is None:
         return None
     try:
@@ -37,48 +38,17 @@ def _num(v) -> Optional[float]:
         return None
 
 
-def _player_match_rating(pr_map: dict, player_id: int) -> Optional[float]:
+def _player_match_rating(pr_map: dict, player_id: int) -> float | None:
     if not pr_map:
         return None
     return _num(pr_map.get(str(player_id)))
 
 
-async def _get_players_by_ids(
-    session: AsyncSession, player_ids: list[int]
-) -> list[Player]:
-    if not player_ids:
-        return []
-    statement = (
-        select(Player)
-        .where(Player.id.in_(player_ids))
-        .options(
-            joinedload(Player.info),
-            joinedload(Player.match_affect_features),
-            joinedload(Player.match_details),
-        )
-    )
-    result = await session.execute(statement)
-    try:
-        return list(result.scalars().unique().all())
-    finally:
-        await result.close()
-
-
 async def _load_match_sides(session: AsyncSession, match_id: int) -> _MatchSides:
-    statement = (
-        select(MatchLogs)
-        .where(MatchLogs.id == match_id)
-        .options(
-            joinedload(MatchLogs.match_details),
-            joinedload(MatchLogs.match_infos).joinedload(MatchInfos.home_team),
-            joinedload(MatchLogs.match_infos).joinedload(MatchInfos.away_team),
-        )
+    match = await fetch_match_log_by_id_with_teams_and_details(
+        session,
+        match_id=match_id,
     )
-    result = await session.execute(statement)
-    try:
-        match = result.scalars().first()
-    finally:
-        await result.close()
 
     if not match:
         raise HTTPException(
@@ -190,11 +160,13 @@ async def get_match_lineup_ratings_for_charts(
 ) -> LineupRatingsRead:
     ctx = await _load_match_sides(session, match_id)
 
-    home_players = await _get_players_by_ids(
-        session, ctx.home_detail.starting_players
+    home_players = await load_players_for_prediction(
+        session,
+        player_ids=ctx.home_detail.starting_players,
     )
-    away_players = await _get_players_by_ids(
-        session, ctx.away_detail.starting_players
+    away_players = await load_players_for_prediction(
+        session,
+        player_ids=ctx.away_detail.starting_players,
     )
 
     if not home_players or not away_players:
@@ -237,4 +209,3 @@ async def get_match_lineup_ratings_for_charts(
         away_team_name=ctx.away_team_name,
         players=points,
     )
-

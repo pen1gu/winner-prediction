@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.app.compute.player_rating import predict_match_outcomes
 from server.app.models import MatchLogs
-from server.app.repositories.lineup_repository import load_players_for_prediction
+from server.app.repositories.prediction_repository import load_players_for_prediction
 
 
 async def try_predict_match_outcomes(

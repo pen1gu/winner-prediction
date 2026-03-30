@@ -292,7 +292,7 @@ async def get_historical_win_rate(
     try:
         details = list(result.scalars())
     finally:
-        await result.close()
+        result.close()
 
     if not details:
         return 0.5
@@ -305,7 +305,7 @@ async def get_historical_win_rate(
     try:
         opp_rows = opp_res.all()
     finally:
-        await opp_res.close()
+        opp_res.close()
 
     by_match: Dict[int, Dict[int, int]] = {}
     for row in opp_rows:

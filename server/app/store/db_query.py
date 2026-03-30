@@ -18,7 +18,7 @@ async def get_already_fetched_team_ids() -> list[int]:
         try:
             return list(result.scalars().all())
         finally:
-            await result.close()
+            result.close()
 
 async def get_already_fetched_player_ids() -> list[int]:
     """
@@ -29,7 +29,7 @@ async def get_already_fetched_player_ids() -> list[int]:
         try:
             return list(result.scalars().all())
         finally:
-            await result.close()
+            result.close()
 
 
 async def get_player_by_id(player_id: int) -> Player | None:
@@ -53,7 +53,7 @@ async def get_player_by_id(player_id: int) -> Player | None:
         try:
             return res.scalar_one_or_none()
         finally:
-            await res.close()
+            res.close()
 
 
 async def get_latest_player_rating(player_id: int) -> PlayerRating | None:
@@ -71,7 +71,7 @@ async def get_latest_player_rating(player_id: int) -> PlayerRating | None:
         try:
             return res.scalar_one_or_none()
         finally:
-            await res.close()
+            res.close()
 
 
 async def fetch_recent_match_logs_for_list(
@@ -92,7 +92,7 @@ async def fetch_recent_match_logs_for_list(
     try:
         return list(result.scalars().unique().all())
     finally:
-        await result.close()
+        result.close()
 
 
 async def fetch_recent_match_summaries(

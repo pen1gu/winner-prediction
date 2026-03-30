@@ -57,7 +57,9 @@ function apiErrorMessage(data, response) {
 
 async function fetchJson(url) {
   const response = await fetch(url);
-  const data = await response.json().catch(() => ({}));
+  const data = await response
+    .json()
+    .catch(() => ({})); // 일부 에러 응답(HTML/빈 바디) 대비
   if (!response.ok) {
     const err = new Error(apiErrorMessage(data, response));
     err.status = response.status;

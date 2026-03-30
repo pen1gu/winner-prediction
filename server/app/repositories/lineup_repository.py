@@ -28,5 +28,5 @@ async def load_players_for_prediction(
     try:
         return list(result.scalars().unique().all())
     finally:
-        await result.close()
+        result.close()
 

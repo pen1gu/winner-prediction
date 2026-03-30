@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
-from sqlmodel import select
 
 from server.app.compute.player_rating import predict_match_outcomes
-from server.app.models import MatchInfos, MatchLogs
-from server.app.repositories.lineup_repository import load_players_for_prediction
+from server.app.repositories.prediction_repository import (
+    fetch_match_for_prediction,
+    load_players_for_prediction,
+)
 from server.app.schemas.prediction import MatchOutcomesRead
 
 
@@ -16,20 +16,10 @@ async def get_match_outcomes(
     *,
     match_id: int,
 ) -> MatchOutcomesRead:
-    statement = (
-        select(MatchLogs)
-        .where(MatchLogs.id == match_id)
-        .options(
-            joinedload(MatchLogs.match_details),
-            joinedload(MatchLogs.match_infos).joinedload(MatchInfos.home_team),
-            joinedload(MatchLogs.match_infos).joinedload(MatchInfos.away_team),
-        )
+    match = await fetch_match_for_prediction(
+        session,
+        match_id=match_id,
     )
-    result = await session.execute(statement)
-    try:
-        match = result.scalars().first()
-    finally:
-        await result.close()
 
     if not match:
         raise HTTPException(
@@ -88,4 +78,3 @@ async def get_match_outcomes(
         draw=outcomes["draw"],
         away=outcomes["away"],
     )
-
