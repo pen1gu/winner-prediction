@@ -1,10 +1,9 @@
-from datetime import datetime
-
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 from sqlmodel import select
 
 from server.app.models import MatchInfos, MatchLogs
+from server.app.mappers.match_mapper import match_log_to_summary_dict
 from server.app.models.session import AsyncSessionLocal
 from server.app.models.teams.team import Team
 from server.app.models.players.player import Player
@@ -19,7 +18,7 @@ async def get_already_fetched_team_ids() -> list[int]:
         try:
             return list(result.scalars().all())
         finally:
-            await result.close()
+            result.close()
 
 async def get_already_fetched_player_ids() -> list[int]:
     """
@@ -30,7 +29,7 @@ async def get_already_fetched_player_ids() -> list[int]:
         try:
             return list(result.scalars().all())
         finally:
-            await result.close()
+            result.close()
 
 
 async def get_player_by_id(player_id: int) -> Player | None:
@@ -54,7 +53,7 @@ async def get_player_by_id(player_id: int) -> Player | None:
         try:
             return res.scalar_one_or_none()
         finally:
-            await res.close()
+            res.close()
 
 
 async def get_latest_player_rating(player_id: int) -> PlayerRating | None:
@@ -72,45 +71,7 @@ async def get_latest_player_rating(player_id: int) -> PlayerRating | None:
         try:
             return res.scalar_one_or_none()
         finally:
-            await res.close()
-
-
-def match_log_to_summary_dict(match: MatchLogs) -> dict:
-    """MatchLogs(관계 로드됨) → 목록 API용 dict."""
-    info = match.match_infos
-    home_detail = next((d for d in match.match_details if d.is_home), None)
-    away_detail = next((d for d in match.match_details if not d.is_home), None)
-
-    match_date: datetime | None = info.match_date if info else None
-
-    return {
-        "match_id": match.id,
-        "home_team": info.home_team.name if info and info.home_team else "Home",
-        "away_team": info.away_team.name if info and info.away_team else "Away",
-        "league_name": info.league_name if info else None,
-        "match_round": info.match_round if info else None,
-        "match_date": match_date,
-        "finished": bool(info.finished) if info else False,
-        "stadium": info.stadium if info else None,
-        "score": {
-            "home": home_detail.score if home_detail else None,
-            "away": away_detail.score if away_detail else None,
-        },
-        "stats": {
-            "home_xg": home_detail.expected_goals_value if home_detail else None,
-            "away_xg": away_detail.expected_goals_value if away_detail else None,
-            "home_possession": home_detail.possession if home_detail else None,
-            "away_possession": away_detail.possession if away_detail else None,
-            "home_shots": home_detail.shots_total if home_detail else None,
-            "away_shots": away_detail.shots_total if away_detail else None,
-            "home_shots_on_target": home_detail.shots_on_target
-            if home_detail
-            else None,
-            "away_shots_on_target": away_detail.shots_on_target
-            if away_detail
-            else None,
-        },
-    }
+            res.close()
 
 
 async def fetch_recent_match_logs_for_list(
@@ -131,7 +92,7 @@ async def fetch_recent_match_logs_for_list(
     try:
         return list(result.scalars().unique().all())
     finally:
-        await result.close()
+        result.close()
 
 
 async def fetch_recent_match_summaries(

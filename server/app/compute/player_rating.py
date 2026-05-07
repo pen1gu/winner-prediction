@@ -1,14 +1,17 @@
 import math
-from typing import List, Dict, Optional, Iterable, Tuple
+from typing import Any, Dict, Iterable, List, Optional
+
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
-from server.app.models import Player, MatchLogs, MatchDetails, Team, MatchInfos
+
+from server.app.models import MatchDetails, Player
 
 
 def _clamp(v: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, v))
 
 
-def _safe_float(v) -> Optional[float]:
+def _safe_float(v: Any) -> Optional[float]:
     try:
         if v is None:
             return None
@@ -208,7 +211,10 @@ async def compute_player_rating(player: Player) -> float:
     rating = _clamp(rating, 900.0, 2300.0)
     return round(rating, 2)
 
-async def compute_lineup_features(players: List[Player], match_context: Dict) -> Dict:
+async def compute_lineup_features(
+    players: List[Player],
+    match_context: Dict[str, Any],
+) -> Dict[str, Any]:
     """
     라인업 기반 feature 확장
     """
@@ -236,7 +242,7 @@ async def compute_lineup_features(players: List[Player], match_context: Dict) ->
         
     avg_age = sum([p.info.age for p in players if p.info and p.info.age]) / len(players) if players else 26
     
-    rest_days = match_context.get("rest_days", 3)
+    rest_days = int(match_context.get("rest_days", 3) or 3)
     fatigue_penalty = 0.95 if rest_days < 3 else 1.0
     
     is_home = 1 if match_context.get("is_home") else 0
@@ -249,7 +255,8 @@ async def compute_lineup_features(players: List[Player], match_context: Dict) ->
         "avg_age": avg_age,
         "is_home": is_home,
         "importance": importance,
-        "rating_diff": total_rating - match_context.get("opponent_rating", total_rating)
+        "rating_diff": total_rating
+        - float(match_context.get("opponent_rating", total_rating) or total_rating),
     }
 
 def softmax(logits: List[float]) -> List[float]:
@@ -259,7 +266,13 @@ def softmax(logits: List[float]) -> List[float]:
     sum_exps = sum(exps)
     return [e / sum_exps for e in exps]
 
-async def get_historical_win_rate(session, team_id: int, is_home: Optional[bool] = None, last_n: int = 50) -> float:
+async def get_historical_win_rate(
+    session: AsyncSession,
+    team_id: int,
+    *,
+    is_home: Optional[bool] = None,
+    last_n: int = 50,
+) -> float:
     """
     특정 팀의 과거 N경기 승률 계산.
 
@@ -279,7 +292,7 @@ async def get_historical_win_rate(session, team_id: int, is_home: Optional[bool]
     try:
         details = list(result.scalars())
     finally:
-        await result.close()
+        result.close()
 
     if not details:
         return 0.5
@@ -292,7 +305,7 @@ async def get_historical_win_rate(session, team_id: int, is_home: Optional[bool]
     try:
         opp_rows = opp_res.all()
     finally:
-        await opp_res.close()
+        opp_res.close()
 
     by_match: Dict[int, Dict[int, int]] = {}
     for row in opp_rows:
@@ -317,7 +330,7 @@ async def get_historical_win_rate(session, team_id: int, is_home: Optional[bool]
     return round(wins / len(details), 4)
 
 async def predict_match_outcomes(
-    session,
+    session: AsyncSession,
     home_players: List[Player], 
     away_players: List[Player], 
     home_team_id: int,

@@ -1,32 +1,10 @@
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
-from sqlmodel import select
 
 from server.app.compute.player_rating import predict_match_outcomes
-from server.app.models import MatchLogs, Player
-
-
-async def load_players_for_prediction(
-    session: AsyncSession, player_ids: List[int]
-) -> List[Player]:
-    if not player_ids:
-        return []
-    statement = (
-        select(Player)
-        .where(Player.id.in_(player_ids))
-        .options(
-            joinedload(Player.info),
-            joinedload(Player.match_affect_features),
-            joinedload(Player.match_details),
-        )
-    )
-    result = await session.execute(statement)
-    try:
-        return list(result.scalars().unique().all())
-    finally:
-        await result.close()
+from server.app.models import MatchLogs
+from server.app.repositories.prediction_repository import load_players_for_prediction
 
 
 async def try_predict_match_outcomes(
@@ -42,10 +20,12 @@ async def try_predict_match_outcomes(
         return None
 
     home_players = await load_players_for_prediction(
-        session, home_detail.starting_players
+        session,
+        player_ids=home_detail.starting_players,
     )
     away_players = await load_players_for_prediction(
-        session, away_detail.starting_players
+        session,
+        player_ids=away_detail.starting_players,
     )
     if not home_players or not away_players:
         return None
