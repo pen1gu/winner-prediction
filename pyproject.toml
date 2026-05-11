@@ -22,6 +22,7 @@ alembic = "^1.17.2"
 scikit-learn = "^1.7.2"
 fastapi = "^0.135.2"
 uvicorn = {extras = ["standard"], version = "^0.42.0"}
+playwright-stealth = "^2.0.3"
 
 [tool.poetry.group.dev.dependencies]
 
